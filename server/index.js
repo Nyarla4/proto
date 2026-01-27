@@ -97,13 +97,16 @@ io.on('connection', (socket) => {
     gameState.turnOrder = gameState.players.map(p => p.id).sort(() => Math.random() - 0.5);
     gameState.currentTurnIndex = 0;
 
+    gameState.votes = {};
+    gameState.votedCount = 0;
+    // 모든 플레이어의 개별 게임 데이터 완전 초기화
     gameState.players.forEach((p, i) => {
       // 라이어 배정 (클라이언트에서 본인이 라이어인지 모르게 하려면 서버는 알고 있어야 함)
       p.role = i === liarIndex ? 'LIAR' : 'CITIZEN';
       // 라이어에게는 다른 단어(함정 단어)를 줌
       p.word = i === liarIndex ? words[1] : words[0];
-      p.votedFor = '';
-      // 각 유저에게 개인별 정보 전송 (보안상 개별 전송)
+      p.votedFor = ''; // 투표 기록 초기화
+      // 게임 시작 시 모든 유저 정보를 동기화하기 위해 보냄,  각 유저에게 개인별 정보 전송 (보안상 개별 전송)
       io.to(p.id).emit('game_start_info', { role: p.role, word: p.word, category });
     });
 
@@ -129,6 +132,7 @@ io.on('connection', (socket) => {
   // [추가] 투표 로직
   socket.on('submit_vote', (targetId) => {
     if (gameState.status !== 'VOTING') return;
+    
     const player = gameState.players.find(p => p.id === socket.id);
     if (player && !player.votedFor) {
       player.votedFor = targetId;

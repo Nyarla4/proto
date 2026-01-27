@@ -7,10 +7,14 @@ import { io } from "socket.io-client";
 const socket = io("http://localhost:3001", { transports: ["websocket"] });
 
 function App() {
+  // --- 스타일 로드 로직 (중복 방지 보강) ---
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = "https://cdn.tailwindcss.com";
-    document.head.appendChild(script);
+    if (!document.getElementById("tailwind-cdn")) {
+      const script = document.createElement("script");
+      script.id = "tailwind-cdn";
+      script.src = "https://cdn.tailwindcss.com";
+      document.head.appendChild(script);
+    }
   }, []);
 
   // --- 상태 관리 (State) ---
@@ -20,13 +24,13 @@ function App() {
   const [message, setMessage] = useState("");     // 입력 중인 메시지
   const [chatLog, setChatLog] = useState([]);     // 채팅 기록
 
-  // --- 소켓 이벤트 리스너 등록 ---
+  // --- 소켓 상태 및 게임 데이터 ---
   const [isConnected, setIsConnected] = useState(socket.connected);
   
   // 게임 내부 진행 상태 및 개인 데이터 관리를 위한 State 추가
   const [gameStatus, setGameStatus] = useState("LOBBY");
-  const [myGameData, setMyGameData] = useState(null); // { role, word, category } 정보 저장
-  const [showError, setShowError] = useState(""); // 상단 에러 알림 UI 텍스트 저장
+  const [myGameData, setMyGameData] = useState(null); // { role, word, category }
+  const [showError, setShowError] = useState("");   // 에러 알림 UI
 
   const [currentTurnId, setCurrentTurnId] = useState(""); 
   
@@ -35,7 +39,7 @@ function App() {
   const [gameResult, setGameResult] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
 
-  const chatEndRef = useRef(null); // 채팅창 하단 자동 스크롤을 위한 참조
+  const chatEndRef = useRef(null); // 채팅창 하단 자동 스크롤
 
   // --- 소켓 이벤트 리스너 등록 ---
   useEffect(() => {
@@ -107,8 +111,8 @@ function App() {
       setTimeout(() => setShowError(""), 2000);
       return;
     }
-      socket.emit("send_message", { message, author: name });
-      setMessage("");
+    socket.emit("send_message", { message, author: name });
+    setMessage("");
   };
 
   // 준비 버튼 클릭
@@ -125,23 +129,24 @@ function App() {
   };
 
 // --- 화면 렌더링 ---
-  
+
   // 1. 입장 전 로비 화면
   if (!isJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
-        <div className="p-10 bg-white rounded-3xl shadow-xl w-full max-w-md border border-slate-200 text-center">
-          <h1 className="text-4xl font-black mb-8 text-blue-600">Liar Game</h1>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 font-sans">
+        <div className="p-12 bg-white rounded-[3rem] shadow-2xl w-full max-w-md border border-slate-200 text-center">
+          <h1 className="text-5xl font-black mb-10 text-blue-600 tracking-tighter italic uppercase">Liar Game</h1>
           <form onSubmit={handleJoin} className="space-y-4">
             <input
               type="text"
-              placeholder="닉네임"
-              className="w-full p-5 bg-slate-50 border-2 rounded-2xl focus:border-blue-500 outline-none font-bold"
+              placeholder="닉네임 입력"
+              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center transition-all"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              maxLength={10}
             />
-            <button className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-blue-700 transition-all">
+            <button className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 uppercase">
               참가하기
             </button>
           </form>
@@ -150,44 +155,51 @@ function App() {
     );
   }
 
-// 2. 게임 대기실 및 채팅 화면
+  // 2. 메인 게임/채팅 화면
   const myInfo = players.find(p => p.id === socket.id);
   const isMyTurn = currentTurnId === socket.id;
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-slate-100 p-4 gap-4 overflow-hidden text-slate-800">
+    <div className="flex flex-col md:flex-row h-screen bg-slate-100 p-4 gap-4 overflow-hidden text-slate-800 font-sans">
       {showError && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black">
           ⚠ {showError}
         </div>
       )}
 
-      {/* 왼쪽 보드 */}
+      {/* 왼쪽 게임 정보 보드 */}
       <div className="w-full md:w-80 flex flex-col gap-4 shrink-0">
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
           <div className="flex justify-between items-center mb-6">
-             <h2 className="text-xl font-black text-slate-700">
-               {gameStatus === "LOBBY" ? "🏠 대기실" : gameStatus === "VOTING" ? "🗳 투표 중" : gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
-             </h2>
-             {gameStatus === "VOTING" && <span className="text-xs bg-amber-100 text-amber-600 px-2 py-1 rounded-md font-bold">{votedCount}/{players.length} 완료</span>}
+            <h2 className="text-xl font-black text-slate-700 tracking-tight">
+              {gameStatus === "LOBBY" ? "🏠 대기실" : gameStatus === "VOTING" ? "🗳 투표 중" : gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
+            </h2>
+            {gameStatus === "VOTING" && (
+              <span className="text-[10px] bg-amber-100 text-amber-600 px-2 py-1 rounded-md font-bold uppercase tracking-tighter">
+                {votedCount}/{players.length} DONE
+              </span>
+            )}
           </div>
           
           {(gameStatus === "PLAYING" || gameStatus === "VOTING") && myGameData && (
-            <div className="bg-indigo-50 p-5 rounded-2xl mb-6 border border-indigo-100 shadow-inner text-center">
-              <p className="text-[10px] text-indigo-400 font-black mb-1 uppercase tracking-widest">Category: {myGameData.category}</p>
-              <p className="text-3xl font-black text-indigo-900">{myGameData.word}</p>
+            <div className="bg-blue-50 p-6 rounded-3xl mb-6 border border-blue-100 text-center shadow-inner">
+              <p className="text-[10px] text-blue-400 font-black mb-1 uppercase tracking-widest italic">Category: {myGameData.category}</p>
+              <p className="text-3xl font-black text-blue-900 tracking-tighter">{myGameData.word}</p>
+              <p className="text-[10px] mt-2 font-bold text-blue-600 opacity-60 italic">
+                {myGameData.role === "LIAR" ? "당신은 라이어입니다!" : "당신은 시민입니다."}
+              </p>
             </div>
           )}
 
           {gameStatus === "RESULT" && gameResult && (
-            <div className={`p-5 rounded-2xl mb-6 text-center border-4 ${gameResult.liar.id === socket.id ? "bg-rose-50 border-rose-200" : "bg-emerald-50 border-emerald-200"}`}>
-              <p className="text-xs font-bold mb-1">라이어의 정체는...</p>
-              <p className="text-2xl font-black text-slate-800 mb-1">{gameResult.liar.name}</p>
-              <p className="text-xs text-slate-400">라이어의 단어: {gameResult.liar.word}</p>
+            <div className={`p-6 rounded-3xl mb-6 text-center border-4 animate-in fade-in zoom-in ${gameResult.liar.id === socket.id ? "bg-rose-50 border-rose-200" : "bg-emerald-50 border-emerald-200"}`}>
+              <p className="text-[10px] font-bold mb-2 text-slate-400 uppercase tracking-widest italic">The Liar was...</p>
+              <p className="text-3xl font-black text-slate-800 mb-1 tracking-tight">{gameResult.liar.name}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase italic tracking-tighter">Word: {gameResult.liar.word}</p>
             </div>
           )}
 
-          <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+          <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
             {players.map((p) => {
               const isTurn = currentTurnId === p.id;
               const voteCount = gameResult?.votes[p.id] || 0;
@@ -195,24 +207,24 @@ function App() {
                 <div 
                   key={p.id} 
                   className={`flex justify-between items-center p-4 rounded-2xl transition-all border-2 ${
-                    isTurn ? "bg-amber-50 border-amber-400 shadow-md scale-[1.02]" : "bg-white border-slate-100"
+                    isTurn ? "bg-amber-50 border-amber-400 shadow-md scale-[1.02]" : "bg-white border-slate-50"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-600">{p.name} {p.isHost && "👑"}</span>
-                    {isTurn && <span className="text-[10px] bg-amber-400 text-white px-1.5 py-0.5 rounded font-black">설명 중</span>}
+                    <span className="font-bold text-slate-700 text-sm">{p.name} {p.isHost && "👑"}</span>
+                    {isTurn && <span className="text-[8px] bg-amber-400 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">Turn</span>}
                   </div>
                   
                   {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
                     <button 
                       onClick={() => handleVote(p.id)}
-                      className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-lg font-black hover:bg-rose-600"
+                      className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors shadow-sm shadow-rose-100"
                     >
                       지목
                     </button>
                   )}
                   {gameStatus === "RESULT" && voteCount > 0 && (
-                    <span className="bg-rose-100 text-rose-600 text-[10px] px-2 py-1 rounded-md font-black">
+                    <span className="bg-rose-100 text-rose-600 text-[10px] px-2 py-1 rounded-lg font-black">
                       {voteCount}표
                     </span>
                   )}
@@ -225,40 +237,40 @@ function App() {
         <div className="shrink-0">
           {gameStatus === "LOBBY" ? (
             myInfo?.isHost ? (
-              <button onClick={handleStartGame} className="w-full bg-rose-500 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-rose-600 active:scale-95 shadow-lg">게임 시작</button>
+              <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-xl hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 transition-all uppercase tracking-tighter italic">Start Game</button>
             ) : (
-              <button onClick={handleToggleReady} className={`w-full py-5 rounded-[1.5rem] font-black text-xl transition-all ${myInfo?.isReady ? "bg-slate-300 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
-                {myInfo?.isReady ? "준비 취소" : "준비 하기"}
+              <button onClick={handleToggleReady} className={`w-full py-5 rounded-[2rem] font-black text-xl transition-all shadow-lg ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100 uppercase"}`}>
+                {myInfo?.isReady ? "READY OK" : "READY"}
               </button>
             )
           ) : gameStatus === "RESULT" && myInfo?.isHost ? (
-            <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-blue-700">다시 게임 시작</button>
+            <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-100 uppercase italic">Restart</button>
           ) : isMyTurn ? (
-            <button onClick={handleNextTurn} className="w-full bg-amber-400 text-amber-900 py-5 rounded-[1.5rem] font-black text-xl hover:bg-amber-500 animate-pulse">설명 완료</button>
+            <button onClick={handleNextTurn} className="w-full bg-amber-400 text-amber-900 py-5 rounded-[2rem] font-black text-xl hover:bg-amber-500 animate-pulse uppercase italic">Done</button>
           ) : (
-            <div className="w-full bg-white p-5 rounded-[1.5rem] border border-dashed border-slate-300 text-center">
-              <p className="text-slate-400 text-sm font-bold animate-pulse">
-                {gameStatus === "VOTING" ? (hasVoted ? "투표 완료! 대기 중..." : "라이어를 지목하세요!") : "경청 중..."}
+            <div className="w-full bg-white p-5 rounded-[2rem] border-2 border-dashed border-slate-200 text-center">
+              <p className="text-slate-400 text-[10px] font-black animate-pulse uppercase tracking-[0.2em]">
+                {gameStatus === "VOTING" ? (hasVoted ? "Waiting for results..." : "Cast your vote!") : "Listening..."}
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* 오른쪽 채팅 */}
-      <div className="flex-1 flex flex-col bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+      {/* 오른쪽 채팅창 */}
+      <div className="flex-1 flex flex-col bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-6 border-b border-slate-50 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className={`w-3.5 h-3.5 rounded-full border-2 border-white ${isConnected ? "bg-emerald-400 shadow-[0_0_8px_#4ade80]" : "bg-rose-400"}`} />
-            <span className="font-black text-slate-700">실시간 채팅</span>
+            <div className={`w-3 h-3 rounded-full ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#4ade80]" : "bg-rose-400"}`} />
+            <span className="font-black text-slate-800 tracking-tight italic uppercase">Live Chat</span>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/20">
           {chatLog.map((chat) => (
             <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : "items-start"}`}>
-              <span className="text-[10px] text-slate-400 font-black mb-1 px-2 uppercase">{chat.author}</span>
-              <div className={`px-5 py-3 rounded-[1.5rem] max-w-[80%] break-all shadow-sm font-medium ${
-                chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 rounded-tl-none border border-slate-100"
+              <span className="text-[10px] text-slate-400 font-black mb-1 px-2 uppercase tracking-tighter">{chat.author}</span>
+              <div className={`px-5 py-3 rounded-[1.8rem] max-w-[85%] break-all shadow-sm font-medium text-sm ${
+                chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 rounded-tl-none border border-slate-50"
               }`}>
                 {chat.message}
               </div>
@@ -266,14 +278,14 @@ function App() {
           ))}
           <div ref={chatEndRef} />
         </div>
-        <form onSubmit={handleSendMessage} className="p-6 bg-white border-t flex gap-3">
+        <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-50 flex gap-3">
           <input
-            className="flex-1 p-4 bg-slate-50 border-2 border-transparent focus:border-blue-400 focus:bg-white rounded-2xl outline-none font-bold"
-            placeholder="메시지 입력..."
+            className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-700 placeholder:text-slate-300 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm"
+            placeholder="메시지를 입력하세요..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
           />
-          <button className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-50">전송</button>
+          <button className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-50 uppercase tracking-tighter italic">Send</button>
         </form>
       </div>
     </div>
