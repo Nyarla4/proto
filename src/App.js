@@ -2,16 +2,17 @@ import React, { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 
 /**
- * 서버 주소 설정 (환경에 따라 수정 가능)
+ * 서버 주소 설정
  */
 const socket = io("http://localhost:3001", { transports: ["websocket"] });
 
 function App() {
-  // --- 스타일 로드 로직 (중복 방지 보강) ---
+  // 스타일 로드
   useEffect(() => {
-    if (!document.getElementById("tailwind-cdn")) {
+    const scriptId = "tailwind-cdn";
+    if (!document.getElementById(scriptId)) {
       const script = document.createElement("script");
-      script.id = "tailwind-cdn";
+      script.id = scriptId;
       script.src = "https://cdn.tailwindcss.com";
       document.head.appendChild(script);
     }
@@ -38,6 +39,9 @@ function App() {
   const [votedCount, setVotedCount] = useState(0);
   const [gameResult, setGameResult] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
+  
+  // 라이어 정답 맞추기 관련 상태
+  const [guessWord, setGuessWord] = useState("");
 
   const chatEndRef = useRef(null); // 채팅창 하단 자동 스크롤
 
@@ -58,6 +62,7 @@ function App() {
       setGameResult(null);
       setHasVoted(false);
       setVotedCount(0);
+      setGuessWord("");
     });
 
     // 전체 게임 상태 업데이트 리스너 (LOBBY <-> PLAYING)
@@ -121,11 +126,18 @@ function App() {
   const handleStartGame = () => socket.emit("start_game");
   const handleNextTurn = () => socket.emit("next_turn");
   
-  // [추가] 투표 핸들러
+  // 투표 핸들러
   const handleVote = (targetId) => {
     if (hasVoted) return;
     socket.emit("submit_vote", targetId);
     setHasVoted(true);
+  };
+
+  const handleSubmitGuess = (e) => {
+    e.preventDefault();
+    if (guessWord.trim()) {
+      socket.emit("submit_guess", guessWord);
+    }
   };
 
 // --- 화면 렌더링 ---
@@ -133,24 +145,19 @@ function App() {
   // 1. 입장 전 로비 화면
   if (!isJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 font-sans">
-        <div className="p-12 bg-white rounded-[3rem] shadow-2xl w-full max-w-md border border-slate-200 text-center">
-          <h1 className="text-5xl font-black mb-10 text-blue-600 tracking-tighter italic uppercase">Liar Game</h1>
-          <form onSubmit={handleJoin} className="space-y-4">
-            <input
-              type="text"
-              placeholder="닉네임 입력"
-              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center transition-all"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={10}
-            />
-            <button className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 uppercase">
-              참가하기
-            </button>
-          </form>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white">
+        <h1 className="text-4xl font-bold mb-8 text-blue-600">Liar Game</h1>
+        <form onSubmit={handleJoin} className="space-y-4 w-64">
+          <input
+            type="text"
+            placeholder="닉네임 입력"
+            className="w-full p-3 border border-gray-300 rounded"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <button className="w-full bg-blue-600 text-white p-3 rounded font-bold hover:bg-blue-700">입장하기</button>
+        </form>
       </div>
     );
   }
@@ -158,119 +165,99 @@ function App() {
   // 2. 메인 게임/채팅 화면
   const myInfo = players.find(p => p.id === socket.id);
   const isMyTurn = currentTurnId === socket.id;
+  const isLiar = myGameData?.role === "LIAR";
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-slate-100 p-4 gap-4 overflow-hidden text-slate-800 font-sans">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-100 p-4 gap-4 overflow-hidden">
       {showError && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black">
-          ⚠ {showError}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50">
+          {showError}
         </div>
       )}
 
-      {/* 왼쪽 게임 정보 보드 */}
-      <div className="w-full md:w-80 flex flex-col gap-4 shrink-0">
-        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-black text-slate-700 tracking-tight">
-              {gameStatus === "LOBBY" ? "🏠 대기실" : gameStatus === "VOTING" ? "🗳 투표 중" : gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
-            </h2>
-            {gameStatus === "VOTING" && (
-              <span className="text-[10px] bg-amber-100 text-amber-600 px-2 py-1 rounded-md font-bold uppercase tracking-tighter">
-                {votedCount}/{players.length} DONE
-              </span>
-            )}
-          </div>
+      {/* 왼쪽 사이드바: 플레이어 리스트 및 정보 */}
+      <div className="w-full md:w-1/4 flex flex-col gap-4 overflow-hidden">
+        <div className="bg-white p-4 rounded-xl shadow-md flex-1 overflow-hidden flex flex-col">
+          <h2 className="text-xl font-bold mb-4 border-b pb-2">
+            {gameStatus === "LOBBY" ? "대기실" : 
+             gameStatus === "VOTING" ? "투표 시간" : 
+             gameStatus === "LIAR_GUESS" ? "라이어의 정답 확인" : "게임 결과"}
+          </h2>
           
-          {(gameStatus === "PLAYING" || gameStatus === "VOTING") && myGameData && (
-            <div className="bg-blue-50 p-6 rounded-3xl mb-6 border border-blue-100 text-center shadow-inner">
-              <p className="text-[10px] text-blue-400 font-black mb-1 uppercase tracking-widest italic">Category: {myGameData.category}</p>
-              <p className="text-3xl font-black text-blue-900 tracking-tighter">{myGameData.word}</p>
-              <p className="text-[10px] mt-2 font-bold text-blue-600 opacity-60 italic">
-                {myGameData.role === "LIAR" ? "당신은 라이어입니다!" : "당신은 시민입니다."}
-              </p>
+          {(gameStatus === "PLAYING" || gameStatus === "VOTING" || gameStatus === "LIAR_GUESS") && myGameData && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg text-center">
+              <p className="text-xs text-blue-400">카테고리: {myGameData.category}</p>
+              <p className="text-2xl font-black text-blue-700">{myGameData.word}</p>
+              {/* <p className="text-xs mt-1 font-bold">{isLiar ? "당신은 라이어입니다!" : "시민입니다."}</p> */}
             </div>
           )}
 
-          {gameStatus === "RESULT" && gameResult && (
-            <div className={`p-6 rounded-3xl mb-6 text-center border-4 animate-in fade-in zoom-in ${gameResult.liar.id === socket.id ? "bg-rose-50 border-rose-200" : "bg-emerald-50 border-emerald-200"}`}>
-              <p className="text-[10px] font-bold mb-2 text-slate-400 uppercase tracking-widest italic">The Liar was...</p>
-              <p className="text-3xl font-black text-slate-800 mb-1 tracking-tight">{gameResult.liar.name}</p>
-              <p className="text-[10px] text-slate-400 font-bold uppercase italic tracking-tighter">Word: {gameResult.liar.word}</p>
-            </div>
-          )}
-
-          <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
-            {players.map((p) => {
-              const isTurn = currentTurnId === p.id;
-              const voteCount = gameResult?.votes[p.id] || 0;
-              return (
-                <div 
-                  key={p.id} 
-                  className={`flex justify-between items-center p-4 rounded-2xl transition-all border-2 ${
-                    isTurn ? "bg-amber-50 border-amber-400 shadow-md scale-[1.02]" : "bg-white border-slate-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-700 text-sm">{p.name} {p.isHost && "👑"}</span>
-                    {isTurn && <span className="text-[8px] bg-amber-400 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">Turn</span>}
-                  </div>
-                  
-                  {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
-                    <button 
-                      onClick={() => handleVote(p.id)}
-                      className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors shadow-sm shadow-rose-100"
-                    >
-                      지목
-                    </button>
-                  )}
-                  {gameStatus === "RESULT" && voteCount > 0 && (
-                    <span className="bg-rose-100 text-rose-600 text-[10px] px-2 py-1 rounded-lg font-black">
-                      {voteCount}표
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {players.map((p) => (
+              <div key={p.id} className={`p-3 rounded-lg flex justify-between items-center ${currentTurnId === p.id ? "bg-yellow-100 border-2 border-yellow-400" : "bg-gray-50 border border-gray-200"}`}>
+                <span className="font-medium text-sm">{p.name} {p.isHost && "👑"}</span>
+                {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
+                  <button onClick={() => handleVote(p.id)} className="text-xs bg-red-500 text-white px-2 py-1 rounded">지목</button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="shrink-0">
+        {/* 액션 버튼 영역 */}
+        <div className="bg-white p-4 rounded-xl shadow-md">
           {gameStatus === "LOBBY" ? (
             myInfo?.isHost ? (
-              <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-xl hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 transition-all uppercase tracking-tighter italic">Start Game</button>
+              <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700">게임 시작</button>
             ) : (
-              <button onClick={handleToggleReady} className={`w-full py-5 rounded-[2rem] font-black text-xl transition-all shadow-lg ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100 uppercase"}`}>
-                {myInfo?.isReady ? "READY OK" : "READY"}
+              <button onClick={handleToggleReady} className={`w-full py-3 rounded-lg font-bold ${myInfo?.isReady ? "bg-gray-300" : "bg-green-500 text-white"}`}>
+                {myInfo?.isReady ? "준비 완료" : "준비하기"}
               </button>
             )
-          ) : gameStatus === "RESULT" && myInfo?.isHost ? (
-            <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-100 uppercase italic">Restart</button>
+          ) : gameStatus === "LIAR_GUESS" ? (
+            isLiar ? (
+              <form onSubmit={handleSubmitGuess} className="space-y-2">
+                <p className="text-xs font-bold text-red-500 text-center">제시어를 맞춰보세요!</p>
+                <input 
+                  type="text" 
+                  value={guessWord} 
+                  onChange={(e) => setGuessWord(e.target.value)}
+                  placeholder="정답 입력"
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+                <button className="w-full bg-red-600 text-white py-2 rounded font-bold">정답 제출</button>
+              </form>
+            ) : (
+              <p className="text-center font-bold text-gray-500 animate-pulse">라이어가 정답을 생각 중입니다...</p>
+            )
+          ) : gameStatus === "RESULT" ? (
+            myInfo?.isHost && <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">다시 하기</button>
           ) : isMyTurn ? (
-            <button onClick={handleNextTurn} className="w-full bg-amber-400 text-amber-900 py-5 rounded-[2rem] font-black text-xl hover:bg-amber-500 animate-pulse uppercase italic">Done</button>
+            <button onClick={handleNextTurn} className="w-full bg-yellow-400 text-yellow-900 py-3 rounded-lg font-bold hover:bg-yellow-500">설명 완료</button>
           ) : (
-            <div className="w-full bg-white p-5 rounded-[2rem] border-2 border-dashed border-slate-200 text-center">
-              <p className="text-slate-400 text-[10px] font-black animate-pulse uppercase tracking-[0.2em]">
-                {gameStatus === "VOTING" ? (hasVoted ? "Waiting for results..." : "Cast your vote!") : "Listening..."}
-              </p>
-            </div>
+            <p className="text-center text-gray-400 text-sm italic">대기 중...</p>
           )}
         </div>
       </div>
 
-      {/* 오른쪽 채팅창 */}
-      <div className="flex-1 flex flex-col bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#4ade80]" : "bg-rose-400"}`} />
-            <span className="font-black text-slate-800 tracking-tight italic uppercase">Live Chat</span>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/20">
+      {/* 오른쪽 메인: 채팅창 및 결과 */}
+      <div className="flex-1 bg-white rounded-xl shadow-md flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+          {gameStatus === "RESULT" && gameResult && (
+            <div className="mb-6 p-4 bg-white border-2 border-blue-400 rounded-xl text-center shadow-lg animate-bounce">
+              <h3 className="text-xl font-bold text-blue-600">게임 종료</h3>
+              <p className="text-lg mt-2">라이어: <span className="font-black">{gameResult.liar.name}</span></p>
+              <p className="font-bold text-gray-700">제시어: {gameResult.liar.word}</p>
+              <div className="mt-4 p-2 bg-blue-600 text-white rounded-lg font-black italic">
+                {gameResult.winner === 'CITIZEN' ? "시민 승리!" : "라이어 승리!"}
+              </div>
+            </div>
+          )}
           {chatLog.map((chat) => (
             <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : "items-start"}`}>
-              <span className="text-[10px] text-slate-400 font-black mb-1 px-2 uppercase tracking-tighter">{chat.author}</span>
-              <div className={`px-5 py-3 rounded-[1.8rem] max-w-[85%] break-all shadow-sm font-medium text-sm ${
-                chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 rounded-tl-none border border-slate-50"
+              <span className="text-[10px] text-gray-500 mb-1">{chat.author}</span>
+              <div className={`px-4 py-2 rounded-2xl max-w-[80%] text-sm ${
+                chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white border border-gray-200 text-gray-800 rounded-tl-none"
               }`}>
                 {chat.message}
               </div>
@@ -278,14 +265,14 @@ function App() {
           ))}
           <div ref={chatEndRef} />
         </div>
-        <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-50 flex gap-3">
+        <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
           <input
-            className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-700 placeholder:text-slate-300 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm"
-            placeholder="메시지를 입력하세요..."
+            className="flex-1 p-2 border border-gray-300 rounded outline-none focus:border-blue-500"
+            placeholder="메시지 입력..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
           />
-          <button className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-50 uppercase tracking-tighter italic">Send</button>
+          <button className="bg-blue-600 text-white px-6 py-2 rounded font-bold">전송</button>
         </form>
       </div>
     </div>
