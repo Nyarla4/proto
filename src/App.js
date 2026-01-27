@@ -7,6 +7,12 @@ import { io } from "socket.io-client";
 const socket = io("http://localhost:3001", { transports: ["websocket"] });
 
 function App() {
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://cdn.tailwindcss.com";
+    document.head.appendChild(script);
+  }, []);
+
   // --- 상태 관리 (State) ---
   const [name, setName] = useState("");         // 사용자의 닉네임
   const [isJoined, setIsJoined] = useState(false); // 입장 여부
@@ -23,7 +29,11 @@ function App() {
   const [showError, setShowError] = useState(""); // 상단 에러 알림 UI 텍스트 저장
 
   const [currentTurnId, setCurrentTurnId] = useState(""); 
-  const [isAllTurnsFinished, setIsAllTurnsFinished] = useState(false); 
+  
+  // [추가] 투표 및 결과 관련 상태
+  const [votedCount, setVotedCount] = useState(0);
+  const [gameResult, setGameResult] = useState(null);
+  const [hasVoted, setHasVoted] = useState(false);
 
   const chatEndRef = useRef(null); // 채팅창 하단 자동 스크롤을 위한 참조
 
@@ -35,24 +45,25 @@ function App() {
     socket.on("update_players", (data) => setPlayers(data));
     // 서버로부터 새 메시지 수신
     socket.on("receive_message", (data) => setChatLog((prev) => [...prev, data]));
+    socket.on("join_success", () => setIsJoined(true));
     
     // 서버로부터 개인별 게임 정보(역할, 단어)를 수신하는 리스너
     socket.on("game_start_info", (data) => {
       setMyGameData(data);
       setGameStatus("PLAYING"); // 게임 화면 모드로 전환
-      setIsAllTurnsFinished(false);
+      setGameResult(null);
+      setHasVoted(false);
+      setVotedCount(0);
     });
 
     // 전체 게임 상태 업데이트 리스너 (LOBBY <-> PLAYING)
     socket.on("update_game_status", (status) => setGameStatus(status));
-
-    socket.on("update_turn", (turnPlayerId) => {
-      setCurrentTurnId(turnPlayerId);
-    });
-
-    socket.on("all_turns_finished", () => {
-      setIsAllTurnsFinished(true);
-      setCurrentTurnId("");
+    socket.on("update_turn", (id) => setCurrentTurnId(id));
+    socket.on("update_voted_count", (count) => setVotedCount(count));
+    
+    socket.on("game_result", (result) => {
+      setGameResult(result);
+      setGameStatus("RESULT");
     });
 
     // 서버 측에서 발생하는 에러(인원 부족, 준비 미완료 등) 알림 리스너
@@ -64,10 +75,12 @@ function App() {
     return () => {
       socket.off("update_players");
       socket.off("receive_message");
+      socket.off("join_success");
       socket.off("game_start_info");
       socket.off("update_game_status");
       socket.off("update_turn");
-      socket.off("all_turns_finished");
+      socket.off("update_voted_count");
+      socket.off("game_result");
       socket.off("game_error");
     };
   }, []);
@@ -82,10 +95,7 @@ function App() {
   // 입장하기
   const handleJoin = (e) => {
     e.preventDefault();
-    if (name.trim()) {
-      socket.emit("join_room", name);
-      setIsJoined(true);
-    }
+    if (name.trim()) socket.emit("join_room", name);
   };
 
   // 메시지 보내기
@@ -97,22 +107,21 @@ function App() {
       setTimeout(() => setShowError(""), 2000);
       return;
     }
-    socket.emit("send_message", { message, author: name });
-    setMessage("");
+      socket.emit("send_message", { message, author: name });
+      setMessage("");
   };
 
   // 준비 버튼 클릭
-  const handleToggleReady = () => {
-    socket.emit("toggle_ready");
-  };
-
+  const handleToggleReady = () => socket.emit("toggle_ready");
   // 방장이 서버에 게임 시작을 요청하는 핸들러
-  const handleStartGame = () => {
-    socket.emit("start_game");
-  };
-
-  const handleNextTurn = () => {
-    socket.emit("next_turn");
+  const handleStartGame = () => socket.emit("start_game");
+  const handleNextTurn = () => socket.emit("next_turn");
+  
+  // [추가] 투표 핸들러
+  const handleVote = (targetId) => {
+    if (hasVoted) return;
+    socket.emit("submit_vote", targetId);
+    setHasVoted(true);
   };
 
 // --- 화면 렌더링 ---
@@ -120,19 +129,19 @@ function App() {
   // 1. 입장 전 로비 화면
   if (!isJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 text-gray-800 font-sans">
-        <div className="p-8 bg-white rounded-xl shadow-lg w-full max-w-md">
-          <h1 className="text-3xl font-extrabold mb-6 text-center text-blue-600 tracking-tighter">Liar Game</h1>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
+        <div className="p-10 bg-white rounded-3xl shadow-xl w-full max-w-md border border-slate-200 text-center">
+          <h1 className="text-4xl font-black mb-8 text-blue-600">Liar Game</h1>
           <form onSubmit={handleJoin} className="space-y-4">
             <input
               type="text"
-              placeholder="닉네임을 입력하세요"
-              className="w-full p-4 border-2 rounded-lg focus:border-blue-500 outline-none transition-all"
+              placeholder="닉네임"
+              className="w-full p-5 bg-slate-50 border-2 rounded-2xl focus:border-blue-500 outline-none font-bold"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
-            <button className="w-full bg-blue-600 text-white p-4 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-md active:scale-95">
+            <button className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-blue-700 transition-all">
               참가하기
             </button>
           </form>
@@ -146,61 +155,65 @@ function App() {
   const isMyTurn = currentTurnId === socket.id;
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-100 p-4 gap-4 overflow-hidden text-gray-800 font-sans">
+    <div className="flex flex-col md:flex-row h-screen bg-slate-100 p-4 gap-4 overflow-hidden text-slate-800">
       {showError && (
-        <div className="fixed top-5 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-8 py-3 rounded-full shadow-2xl z-50 animate-bounce font-black">
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black">
           ⚠ {showError}
         </div>
       )}
 
-      <div className="w-full md:w-1/3 flex flex-col gap-4 min-h-0">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
-          <div className="flex justify-between items-center mb-4 border-b pb-2">
-             <h2 className="text-xl font-bold">
-               {gameStatus === "LOBBY" ? "🏠 대기실" : "🎮 게임 진행 중"}
+      {/* 왼쪽 보드 */}
+      <div className="w-full md:w-80 flex flex-col gap-4 shrink-0">
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+          <div className="flex justify-between items-center mb-6">
+             <h2 className="text-xl font-black text-slate-700">
+               {gameStatus === "LOBBY" ? "🏠 대기실" : gameStatus === "VOTING" ? "🗳 투표 중" : gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
              </h2>
-             {/* 게임 상태를 명확히 알리는 텍스트 추가 */}
-             {gameStatus === "PLAYING" && (
-               <span className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded-md font-black animate-pulse uppercase">
-                 IN GAME
-               </span>
-             )}
+             {gameStatus === "VOTING" && <span className="text-xs bg-amber-100 text-amber-600 px-2 py-1 rounded-md font-bold">{votedCount}/{players.length} 완료</span>}
           </div>
           
-          {gameStatus === "PLAYING" && myGameData && (
-            <div className="bg-blue-50 p-5 rounded-2xl mb-4 border border-blue-100 shadow-inner">
-              <p className="text-xs text-blue-500 font-bold text-center mb-1">카테고리: {myGameData.category}</p>
-              <div className="text-center">
-                <p className="text-[10px] text-gray-400 font-semibold mb-1">당신의 제시어</p>
-                {/* 라이어도 시민과 완전히 동일하게 보이도록 '당신은 라이어입니다' 문구 삭제 */}
-                <p className="text-3xl font-black text-slate-800 tracking-tight">{myGameData.word}</p>
-              </div>
+          {(gameStatus === "PLAYING" || gameStatus === "VOTING") && myGameData && (
+            <div className="bg-indigo-50 p-5 rounded-2xl mb-6 border border-indigo-100 shadow-inner text-center">
+              <p className="text-[10px] text-indigo-400 font-black mb-1 uppercase tracking-widest">Category: {myGameData.category}</p>
+              <p className="text-3xl font-black text-indigo-900">{myGameData.word}</p>
             </div>
           )}
 
-          <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+          {gameStatus === "RESULT" && gameResult && (
+            <div className={`p-5 rounded-2xl mb-6 text-center border-4 ${gameResult.liar.id === socket.id ? "bg-rose-50 border-rose-200" : "bg-emerald-50 border-emerald-200"}`}>
+              <p className="text-xs font-bold mb-1">라이어의 정체는...</p>
+              <p className="text-2xl font-black text-slate-800 mb-1">{gameResult.liar.name}</p>
+              <p className="text-xs text-slate-400">라이어의 단어: {gameResult.liar.word}</p>
+            </div>
+          )}
+
+          <div className="flex-1 space-y-3 overflow-y-auto pr-1">
             {players.map((p) => {
-              const isTurnPlayer = currentTurnId === p.id;
+              const isTurn = currentTurnId === p.id;
+              const voteCount = gameResult?.votes[p.id] || 0;
               return (
                 <div 
                   key={p.id} 
-                  className={`flex justify-between items-center p-3 rounded-xl transition-all border-2 ${
-                    isTurnPlayer 
-                    ? "bg-yellow-50 border-yellow-400 ring-4 ring-yellow-100 ring-opacity-50" 
-                    : p.id === socket.id ? "bg-blue-50 border-blue-100" : "bg-gray-50 border-transparent"
+                  className={`flex justify-between items-center p-4 rounded-2xl transition-all border-2 ${
+                    isTurn ? "bg-amber-50 border-amber-400 shadow-md scale-[1.02]" : "bg-white border-slate-100"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm">{p.name} {p.isHost && "👑"}</span>
-                    {isTurnPlayer && <span className="animate-pulse text-[10px] bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded-md font-black">말하는 중</span>}
+                    <span className="font-bold text-slate-600">{p.name} {p.isHost && "👑"}</span>
+                    {isTurn && <span className="text-[10px] bg-amber-400 text-white px-1.5 py-0.5 rounded font-black">설명 중</span>}
                   </div>
-                  {gameStatus === "LOBBY" ? (
-                    <span className={`text-[9px] px-2 py-1 rounded-full font-black ${p.isReady ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-400"}`}>
-                      {p.isReady ? "READY" : "WAITING"}
-                    </span>
-                  ) : (
-                    <span className="text-[9px] px-2 py-1 rounded-full bg-blue-600 text-white font-black shadow-sm">
-                      PLAYING
+                  
+                  {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
+                    <button 
+                      onClick={() => handleVote(p.id)}
+                      className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-lg font-black hover:bg-rose-600"
+                    >
+                      지목
+                    </button>
+                  )}
+                  {gameStatus === "RESULT" && voteCount > 0 && (
+                    <span className="bg-rose-100 text-rose-600 text-[10px] px-2 py-1 rounded-md font-black">
+                      {voteCount}표
                     </span>
                   )}
                 </div>
@@ -209,69 +222,43 @@ function App() {
           </div>
         </div>
 
-        <div className="mt-auto shrink-0">
+        <div className="shrink-0">
           {gameStatus === "LOBBY" ? (
             myInfo?.isHost ? (
-              <button 
-                onClick={handleStartGame}
-                className="w-full bg-red-500 text-white py-5 rounded-2xl font-black text-xl hover:bg-red-600 shadow-lg active:scale-95 transition-all"
-              >
-                게임 시작
-              </button>
+              <button onClick={handleStartGame} className="w-full bg-rose-500 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-rose-600 active:scale-95 shadow-lg">게임 시작</button>
             ) : (
-            // 버튼 클릭 시 위에서 정의한 handleToggleReady를 호출하도록 변경했습니다.
-              <button
-                onClick={handleToggleReady}
-                className={`w-full py-5 rounded-2xl font-black text-xl shadow-lg transition-all active:scale-95 ${
-                  myInfo?.isReady ? "bg-gray-400 text-white shadow-none" : "bg-green-500 text-white hover:bg-green-600 shadow-green-100"
-                }`}
-              >
+              <button onClick={handleToggleReady} className={`w-full py-5 rounded-[1.5rem] font-black text-xl transition-all ${myInfo?.isReady ? "bg-slate-300 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
                 {myInfo?.isReady ? "준비 취소" : "준비 하기"}
               </button>
             )
+          ) : gameStatus === "RESULT" && myInfo?.isHost ? (
+            <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-blue-700">다시 게임 시작</button>
+          ) : isMyTurn ? (
+            <button onClick={handleNextTurn} className="w-full bg-amber-400 text-amber-900 py-5 rounded-[1.5rem] font-black text-xl hover:bg-amber-500 animate-pulse">설명 완료</button>
           ) : (
-            <div className="space-y-2">
-              {isMyTurn && (
-                <button 
-                  onClick={handleNextTurn}
-                  className="w-full bg-yellow-400 text-yellow-900 py-5 rounded-2xl font-black text-xl hover:bg-yellow-500 shadow-xl animate-pulse active:scale-95"
-                >
-                  설명 완료 (다음 차례)
-                </button>
-              )}
-              {isAllTurnsFinished && myInfo?.isHost && (
-                <button 
-                  onClick={handleStartGame}
-                  className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-blue-700 shadow-lg active:scale-95"
-                >
-                  새 게임 시작
-                </button>
-              )}
-              {!isMyTurn && !isAllTurnsFinished && (
-                <div className="w-full bg-white p-5 rounded-2xl border border-dashed border-gray-300 text-center shadow-inner">
-                  <p className="text-gray-400 text-sm font-bold animate-pulse">상대방의 설명을 경청하세요...</p>
-                </div>
-              )}
+            <div className="w-full bg-white p-5 rounded-[1.5rem] border border-dashed border-slate-300 text-center">
+              <p className="text-slate-400 text-sm font-bold animate-pulse">
+                {gameStatus === "VOTING" ? (hasVoted ? "투표 완료! 대기 중..." : "라이어를 지목하세요!") : "경청 중..."}
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-0">
-        <div className="p-4 bg-slate-800 text-white font-bold flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-2">
-            {/* 연결 상태 점이 더 잘 보이도록 강조 */}
-            <div className={`w-3 h-3 rounded-full border-2 border-slate-700 ${isConnected ? "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]" : "bg-red-400"}`}></div>
-            <span className="text-sm">실시간 채팅</span>
+      {/* 오른쪽 채팅 */}
+      <div className="flex-1 flex flex-col bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className={`w-3.5 h-3.5 rounded-full border-2 border-white ${isConnected ? "bg-emerald-400 shadow-[0_0_8px_#4ade80]" : "bg-rose-400"}`} />
+            <span className="font-black text-slate-700">실시간 채팅</span>
           </div>
-          <span className="text-[10px] font-normal text-slate-400 italic">메시지 전송 시 엔터 가능</span>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
           {chatLog.map((chat) => (
             <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : "items-start"}`}>
-              <span className="text-[10px] text-gray-400 mb-1 font-bold px-1">{chat.author}</span>
-              <div className={`px-4 py-2 rounded-2xl max-w-[85%] break-all shadow-sm ${
-                chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
+              <span className="text-[10px] text-slate-400 font-black mb-1 px-2 uppercase">{chat.author}</span>
+              <div className={`px-5 py-3 rounded-[1.5rem] max-w-[80%] break-all shadow-sm font-medium ${
+                chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 rounded-tl-none border border-slate-100"
               }`}>
                 {chat.message}
               </div>
@@ -279,16 +266,14 @@ function App() {
           ))}
           <div ref={chatEndRef} />
         </div>
-        <form onSubmit={handleSendMessage} className="p-4 bg-white border-t flex gap-2 shrink-0">
+        <form onSubmit={handleSendMessage} className="p-6 bg-white border-t flex gap-3">
           <input
-            className="flex-1 p-3 bg-gray-50 border-2 border-transparent focus:border-blue-400 focus:bg-white rounded-xl outline-none font-medium transition-all"
-            placeholder="메시지를 입력하세요..."
+            className="flex-1 p-4 bg-slate-50 border-2 border-transparent focus:border-blue-400 focus:bg-white rounded-2xl outline-none font-bold"
+            placeholder="메시지 입력..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
           />
-          <button className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md">
-            전송
-          </button>
+          <button className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-50">전송</button>
         </form>
       </div>
     </div>

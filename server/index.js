@@ -14,10 +14,7 @@ app.use(cors()); // 교차 출처 리소스 공유 허용
 // HTTP 서버 생성 및 소켓 초기화
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*", // 리액트 개발 서버 주소 (Vite 기본값)
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 // 단어 데이터베이스
@@ -35,16 +32,21 @@ const wordDb = {
  */
 let gameState = {
   players: [],     // { id, name, isReady, isHost, score }
-  status: 'LOBBY', // 게임 상태: LOBBY, PLAYING, VOTING, GUESSING
+  status: 'LOBBY', // 게임 상태: LOBBY, PLAYING, VOTING, RESULT
   category: '',
   turnOrder: [],
-  currentTurnIndex: 0
+  currentTurnIndex: 0,
+  votes: {}, // { targetId: count }
+  votedCount: 0
 };
 
 io.on('connection', (socket) => {
   // 입장 로직
   // 1. 방 입장 이벤트
   socket.on('join_room', (userName) => {
+    const isDuplicate = gameState.players.some(p => p.name === userName);
+    if (isDuplicate) return socket.emit('game_error', '이미 사용 중인 닉네임입니다.');
+
     // 첫 번째로 들어온 사람을 방장(Host)으로 지정
     const isHost = gameState.players.length === 0;
     gameState.players.push({
@@ -53,8 +55,10 @@ io.on('connection', (socket) => {
       isReady: isHost, // 방장은 자동으로 준비 상태
       isHost: isHost,
       role: '',
-      word: ''
+      word: '',
+      votedFor: '' // 누구에게 투표했는지 저장
     });
+    socket.emit('join_success');
     // 방 안의 모든 사람에게 업데이트된 플레이어 명단 전송
     io.emit('update_players', gameState.players);
   });
@@ -63,11 +67,10 @@ io.on('connection', (socket) => {
   // 채팅 로직: 게임 상태와 관계없이 항상 동작함
   socket.on('send_message', (data) => {
     // 서버 시간 기준으로 ID를 생성하여 중복 방지 및 전송
-    io.emit('receive_message', { 
-      id: Date.now() + Math.random(), 
-      message: data.message, 
-      author: data.author,
-      socketId: socket.id // 보낸 사람 구분을 위해 추가
+    io.emit('receive_message', {
+      id: Date.now() + Math.random(),
+      message: data.message,
+      author: data.author
     });
   });
 
@@ -85,25 +88,23 @@ io.on('connection', (socket) => {
     
     // 4. 라이어 선정 및 역할 부여
     const liarIndex = Math.floor(Math.random() * gameState.players.length);
+
     gameState.status = 'PLAYING';
     gameState.category = category;
-
+    gameState.votes = {};
+    gameState.votedCount = 0;
     // 턴 순서 무작위 셔플
     gameState.turnOrder = gameState.players.map(p => p.id).sort(() => Math.random() - 0.5);
     gameState.currentTurnIndex = 0;
 
-    gameState.players.forEach((player, index) => {
+    gameState.players.forEach((p, i) => {
       // 라이어 배정 (클라이언트에서 본인이 라이어인지 모르게 하려면 서버는 알고 있어야 함)
-      player.role = index === liarIndex ? 'LIAR' : 'CITIZEN';
+      p.role = i === liarIndex ? 'LIAR' : 'CITIZEN';
       // 라이어에게는 다른 단어(함정 단어)를 줌
-      player.word = index === liarIndex ? words[1] : words[0];
-      
+      p.word = i === liarIndex ? words[1] : words[0];
+      p.votedFor = '';
       // 각 유저에게 개인별 정보 전송 (보안상 개별 전송)
-      io.to(player.id).emit('game_start_info', {
-        role: player.role,
-        word: player.word,
-        category: category
-      });
+      io.to(p.id).emit('game_start_info', { role: p.role, word: p.word, category });
     });
 
     io.emit('update_game_status', 'PLAYING');
@@ -114,19 +115,41 @@ io.on('connection', (socket) => {
   socket.on('next_turn', () => {
     // 현재 턴인 사람만 턴을 넘길 수 있도록 검증
     if (socket.id !== gameState.turnOrder[gameState.currentTurnIndex]) return;
-
     gameState.currentTurnIndex++;
-    
     if (gameState.currentTurnIndex < gameState.turnOrder.length) {
       io.emit('update_turn', gameState.turnOrder[gameState.currentTurnIndex]);
     } else {
-      // 모든 플레이어가 설명을 마침
+      // 모든 턴 종료 시 투표 단계로 진입
+      gameState.status = 'VOTING';
+      io.emit('update_game_status', 'VOTING');
       io.emit('all_turns_finished');
-      // 여기서 투표 단계로 상태를 바꿀 수도 있음
     }
   });
 
-  // 준비 토글
+  // [추가] 투표 로직
+  socket.on('submit_vote', (targetId) => {
+    if (gameState.status !== 'VOTING') return;
+    const player = gameState.players.find(p => p.id === socket.id);
+    if (player && !player.votedFor) {
+      player.votedFor = targetId;
+      gameState.votes[targetId] = (gameState.votes[targetId] || 0) + 1;
+      gameState.votedCount++;
+
+      io.emit('update_voted_count', gameState.votedCount);
+
+      // 전원 투표 완료 시 결과 발표
+      if (gameState.votedCount === gameState.players.length) {
+        const liar = gameState.players.find(p => p.role === 'LIAR');
+        gameState.status = 'RESULT';
+        io.emit('game_result', {
+          liar: { id: liar.id, name: liar.name, word: liar.word },
+          votes: gameState.votes
+        });
+        io.emit('update_game_status', 'RESULT');
+      }
+    }
+  });
+
   socket.on('toggle_ready', () => {
     const player = gameState.players.find(p => p.id === socket.id);
     if (player && !player.isHost) {
@@ -138,8 +161,21 @@ io.on('connection', (socket) => {
 
   // 퇴장 처리
   socket.on('disconnect', () => {
+    const wasTurnPlayer = gameState.turnOrder[gameState.currentTurnIndex] === socket.id;
     // 접속 끊긴 유저 제거
     gameState.players = gameState.players.filter(p => p.id !== socket.id);
+    gameState.turnOrder = gameState.turnOrder.filter(id => id !== socket.id);
+
+    if (wasTurnPlayer && gameState.status === 'PLAYING') {
+      if (gameState.currentTurnIndex >= gameState.turnOrder.length) {
+        gameState.status = 'VOTING';
+        io.emit('update_game_status', 'VOTING');
+        io.emit('all_turns_finished');
+      } else {
+        io.emit('update_turn', gameState.turnOrder[gameState.currentTurnIndex]);
+      }
+    }
+    
     // 방장이 나가면 다음 사람에게 위임
     if (gameState.players.length > 0 && !gameState.players.some(p => p.isHost)) {
       gameState.players[0].isHost = true;
@@ -150,4 +186,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = 3001;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on ${PORT}`));
