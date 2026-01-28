@@ -247,6 +247,15 @@ function App() {
                       <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
                         {p.name} {p.isHost && "👑"}
                       </span>
+
+                      {/* [추가] 점수 표시 배지: 닉네임 바로 뒤에 위치 */}
+                      <span className={`
+                        text-[10px] font-black px-2 py-0.5 rounded-full 
+                        ${socket.id === p.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"}
+                      `}>
+                        {p.score || 0}pt
+                      </span>
+
                       {currentTurnId === p.id && gameStatus === "PLAYING" && (
                         <span className="text-[7px] md:text-[8px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse uppercase">Turn</span>
                       )}
