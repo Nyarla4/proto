@@ -7,7 +7,6 @@ const path = require('path');
 const app = express();
 app.use(cors());
 
-// 리액트 빌드 결과물(build 폴더) 정적 서비스 설정
 const buildPath = path.join(__dirname, '../build');
 app.use(express.static(buildPath));
 
@@ -16,21 +15,17 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// 게임 데이터베이스
 const wordDb = {
-  "동물": ["강아지", "고양이", "사자", "호랑이", "코끼리", "토끼", "판다"],
+  "동물": ["강아지", "고양이", "사자", "호랑이", "코끼리", "기린", "펭귄", "토끼", "다람쥐", "판다"],
   "과일": ["사과", "바나나", "포도", "딸기", "수박", "복숭아", "멜론"],
-  "직업": ["의사", "경찰", "선생님", "요리사", "판사", "가수", "화가"],
-  "음식": ["피자", "치킨", "햄버거", "떡볶이", "초밥", "파스타", "삼겹살"]
+  "직업": ["의사", "경찰관", "소방관", "선생님", "요리사", "판사", "프로그래머", "변호사", "가수", "운동선수", "과학자", "화가"],
+  "음식": ["피자", "비빔밥", "치킨", "햄버거", "떡볶이", "초밥", "파스타", "삼겹살", "짜장면", "냉면"],
+  "전자제품": ["스마트폰", "노트북", "냉장고", "세탁기", "에어컨", "텔레비전", "전자레인지", "청소기", "가습기", "이어폰"],
+  "운동": ["축구", "농구", "야구", "배구", "수영", "테니스", "골프", "배드민턴", "스케이트", "탁구"]
 };
 
-/**
- * 방 정보를 저장할 객체
- * 구조: { roomId: { players: [], status: 'LOBBY', ...gameData } }
- */
 const rooms = {};
 
-// 투표 결과 처리 함수 (방 단위로 실행)
 const processVoteResults = (roomId) => {
   const room = rooms[roomId];
   if (!room) return;
@@ -70,9 +65,6 @@ const processVoteResults = (roomId) => {
 };
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-
-  // 1. 방 입장 (Join Room)
   socket.on('join-room', ({ roomId, name }) => {
     if (!rooms[roomId]) {
       rooms[roomId] = {
@@ -109,7 +101,6 @@ io.on('connection', (socket) => {
     };
 
     room.players.push(newPlayer);
-    
     socket.emit('join-success');
     io.to(roomId).emit('update-players', room.players);
     io.to(roomId).emit('chat-message', {
@@ -119,7 +110,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 2. 메시지 전송
   socket.on('send-message', ({ roomId, message }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -133,7 +123,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 3. 게임 시작
   socket.on('start-game', (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -171,11 +160,22 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('chat-message', { id: 'sys-start', author: 'SYSTEM', message: '게임을 시작합니다! 순서대로 단어를 설명해주세요.' });
   });
 
-  // 4. 턴 넘기기
-  socket.on('next-turn', () => {
+  // 4. 턴 넘기기 (설명 내용 포함 버전으로 수정)
+  socket.on('next-turn', (description) => {
     const roomId = socket.roomId;
     const room = rooms[roomId];
     if (!room || socket.id !== room.turnOrder[room.currentTurnIndex]) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+
+    // 설명이 있을 경우 채팅창에 공식적으로 노출
+    if (description && description.trim()) {
+        io.to(roomId).emit('chat-message', {
+            id: 'desc-' + Date.now(),
+            author: 'SYSTEM_DESC', // 특수 타입 부여
+            message: `📢 [설명] ${player.name}: "${description}"`
+        });
+    }
 
     room.currentTurnIndex++;
     if (room.currentTurnIndex < room.turnOrder.length) {
@@ -187,7 +187,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 5. 투표 제출
   socket.on('submit-vote', (targetId) => {
     const roomId = socket.roomId;
     const room = rooms[roomId];
@@ -206,7 +205,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 6. 라이어 정답 맞히기
   socket.on('submit-guess', (guess) => {
     const roomId = socket.roomId;
     const room = rooms[roomId];
@@ -237,7 +235,6 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('update-players', room.players);
   });
 
-  // 7. 준비 상태 토글
   socket.on('toggle-ready', () => {
     const roomId = socket.roomId;
     const room = rooms[roomId];
@@ -249,7 +246,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 8. 연결 해제
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
@@ -263,13 +259,11 @@ io.on('connection', (socket) => {
         if (room.players.length === 0) {
           delete rooms[roomId];
         } else {
-          // 방장 위임
           if (leftPlayer.isHost) {
             room.players[0].isHost = true;
             room.players[0].isReady = true;
           }
 
-          // 게임 중 탈주 처리
           if (room.status !== 'LOBBY' && room.status !== 'RESULT') {
             if (leftPlayer.role === 'LIAR') {
               io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: '라이어가 나갔습니다! 시민의 승리입니다.' });
