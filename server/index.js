@@ -1,23 +1,17 @@
-/**
- * 라이어 게임 서버 (Node.js + Socket.io)
- * 포트: 3001
- */
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
 const app = express();
-app.use(cors()); // 교차 출처 리소스 공유 허용
+app.use(cors());
 
-// HTTP 서버 생성 및 소켓 초기화
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// 단어 데이터베이스
+// 단어 데이터베이스 (이전 구조로 복구)
 const wordDb = {
   "동물": ["강아지", "고양이", "사자", "호랑이", "코끼리", "토끼", "판다"],
   "과일": ["사과", "바나나", "포도", "딸기", "수박", "복숭아", "멜론"],
@@ -25,25 +19,23 @@ const wordDb = {
   "음식": ["피자", "치킨", "햄버거", "떡볶이", "초밥", "파스타", "삼겹살"]
 };
 
-/**
- * 게임의 상태를 관리하는 객체
- * 실제 서비스에서는 여러 방을 관리하기 위해 Map이나 DB를 사용하지만,
- * 연습용이므로 단일 방 객체로 구현합니다.
- */
 let gameState = {
-  players: [],     // { id, name, isReady, isHost, score }
-  status: 'LOBBY', // 게임 상태: LOBBY, PLAYING, VOTING, RESULT
+  players: [],
+  status: 'LOBBY',
   category: '',
-  correctWord: '',
+  citizenWord: '', // 시민들이 가진 정답 단어
+  liarWord: '',    // 라이어가 가진 가짜 단어
   turnOrder: [],
   currentTurnIndex: 0,
   votes: {},
-  votedCount: 0
+  votedCount: 0,
+  roundResults: {
+    voteSuccess: false,
+    guessSuccess: false
+  }
 };
 
 io.on('connection', (socket) => {
-  // 입장 로직
-  // 1. 방 입장 이벤트
   socket.on('join_room', (userName) => {
     const isDuplicate = gameState.players.some(p => p.name === userName);
     if (isDuplicate) return socket.emit('game_error', '이미 사용 중인 닉네임입니다.');
@@ -56,7 +48,8 @@ io.on('connection', (socket) => {
       isHost: isHost,
       role: '',
       word: '',
-      votedFor: ''
+      votedFor: '',
+      score: 0
     });
     socket.emit('join_success');
     io.emit('update_players', gameState.players);
@@ -75,24 +68,31 @@ io.on('connection', (socket) => {
     if (!gameState.players.every(p => p.isReady)) return socket.emit('game_error', '모든 플레이어가 준비 완료 상태여야 합니다.');
 
     const categories = Object.keys(wordDb);
-    const category = categories[Math.floor(Math.random() * categories.length)];
-    const wordList = [...wordDb[category]].sort(() => Math.random() - 0.5);
-    const correctWord = wordList[0];
+    const categoryName = categories[Math.floor(Math.random() * categories.length)];
+    
+    // 이전에 사용하던 방식: 리스트를 섞어서 인덱스로 배정
+    const shuffledWords = [...wordDb[categoryName]].sort(() => Math.random() - 0.5);
+    const liarWord = shuffledWords[0];    // 인덱스 0은 라이어용 가짜 단어
+    const citizenWord = shuffledWords[1]; // 인덱스 1은 시민용 정답 단어
+    
     const liarIndex = Math.floor(Math.random() * gameState.players.length);
 
     gameState.status = 'PLAYING';
-    gameState.category = category;
-    gameState.correctWord = correctWord;
+    gameState.category = categoryName;
+    gameState.liarWord = liarWord;
+    gameState.citizenWord = citizenWord;
     gameState.votes = {};
     gameState.votedCount = 0;
+    gameState.roundResults = { voteSuccess: false, guessSuccess: false };
     gameState.turnOrder = gameState.players.map(p => p.id).sort(() => Math.random() - 0.5);
     gameState.currentTurnIndex = 0;
 
     gameState.players.forEach((p, i) => {
-      p.role = i === liarIndex ? 'LIAR' : 'CITIZEN';
-      p.word = i === liarIndex ? '당신은 라이어입니다.' : correctWord;
+      const isLiar = i === liarIndex;
+      p.role = isLiar ? 'LIAR' : 'CITIZEN';
+      p.word = isLiar ? liarWord : citizenWord; // 요청하신 인덱스 방식 적용
       p.votedFor = '';
-      io.to(p.id).emit('game_start_info', { role: p.role, word: p.word, category });
+      io.to(p.id).emit('game_start_info', { role: p.role, word: p.word, category: categoryName });
     });
 
     io.emit('update_game_status', 'PLAYING');
@@ -118,48 +118,54 @@ io.on('connection', (socket) => {
       player.votedFor = targetId;
       gameState.votes[targetId] = (gameState.votes[targetId] || 0) + 1;
       gameState.votedCount++;
-
       io.emit('update_voted_count', gameState.votedCount);
 
       if (gameState.votedCount === gameState.players.length) {
-        // 투표 결과 계산
         const sortedVotes = Object.entries(gameState.votes).sort((a, b) => b[1] - a[1]);
         const mostVotedId = sortedVotes[0][0];
         const liar = gameState.players.find(p => p.role === 'LIAR');
 
+        // [규칙 1] 투표 결과 점수 부여
         if (mostVotedId === liar.id) {
-          // 라이어 검거 성공 -> 라이어의 최후 변론/정답 맞추기 시간
-          gameState.status = 'LIAR_GUESS';
-          io.emit('update_game_status', 'LIAR_GUESS');
+          gameState.roundResults.voteSuccess = true;
+          gameState.players.forEach(p => { if (p.role === 'CITIZEN') p.score += 1; });
         } else {
-          // 검거 실패 -> 라이어 승리
-          gameState.status = 'RESULT';
-          io.emit('game_result', {
-            winner: 'LIAR',
-            liar: { name: liar.name, word: gameState.correctWord },
-            votes: gameState.votes
-          });
-          io.emit('update_game_status', 'RESULT');
+          gameState.roundResults.voteSuccess = false;
+          liar.score += 1;
         }
+
+        // 투표 성공/실패 여부와 관계없이 라이어의 정답 맞히기 단계 진입
+        gameState.status = 'LIAR_GUESS';
+        io.emit('update_game_status', 'LIAR_GUESS');
+        io.emit('update_players', gameState.players);
       }
     }
   });
 
-  // 라이어의 정답 제출 처리
   socket.on('submit_guess', (guess) => {
     if (gameState.status !== 'LIAR_GUESS') return;
     const liar = gameState.players.find(p => p.id === socket.id);
     if (!liar || liar.role !== 'LIAR') return;
 
-    const isCorrect = guess.trim() === gameState.correctWord;
+    const isCorrect = guess.trim() === gameState.citizenWord;
+    gameState.roundResults.guessSuccess = isCorrect;
+
+    // [규칙 2] 라이어의 정답 맞히기 점수 부여
+    if (isCorrect) {
+      liar.score += 1;
+    } else {
+      gameState.players.forEach(p => { if (p.role === 'CITIZEN') p.score += 1; });
+    }
+
     gameState.status = 'RESULT';
-    
     io.emit('game_result', {
-      winner: isCorrect ? 'LIAR' : 'CITIZEN',
-      liar: { name: liar.name, word: gameState.correctWord },
+      voteSuccess: gameState.roundResults.voteSuccess,
+      guessSuccess: isCorrect,
+      liar: { name: liar.name, word: gameState.citizenWord },
       votes: gameState.votes
     });
     io.emit('update_game_status', 'RESULT');
+    io.emit('update_players', gameState.players);
   });
 
   socket.on('toggle_ready', () => {
