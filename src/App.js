@@ -196,110 +196,119 @@ function App() {
         <div className={`
           ${isInfoVisible ? 'flex' : 'hidden'} 
           md:flex w-full md:w-1/3 flex-col gap-2 md:gap-4 overflow-hidden h-full shrink-0
-          max-h-[45vh] md:max-h-full
+          max-h-[50vh] md:max-h-full transition-all duration-300
         `}>
-          {/* 프로필 정보 상단 고정 (기존 디자인 유지) */}
-          <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-4">
-            <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-inner">
-              <span className="text-xl md:text-2xl">👤</span>
+          {/* 프로필 정보 (모바일에서는 간소화) */}
+          <div className="bg-white p-3 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-3 md:gap-4">
+            <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-2 md:border-4 border-white shadow-inner">
+              <span className="text-lg md:text-2xl">👤</span>
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="font-black text-lg md:text-xl text-slate-900 leading-none">{name}</span>
-                <span className="bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase">Me</span>
+                <span className="font-black text-base md:text-xl text-slate-900 leading-none truncate max-w-[100px] md:max-w-none">{name}</span>
+                <span className="bg-blue-600 text-white text-[8px] md:text-[10px] px-1.5 py-0.5 rounded-full font-black uppercase">Me</span>
               </div>
-              <span className="text-slate-400 text-[10px] md:text-xs font-bold mt-1">
+              <span className="text-slate-400 text-[9px] md:text-xs font-bold mt-1">
                 SCORE: <span className="text-blue-600">{myInfo?.score || 0}</span> | {myInfo?.isHost ? "방장 👑" : "멤버"}
               </span>
             </div>
           </div>
 
-          <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
-            <h2 className="text-lg md:text-xl font-black mb-4 border-b pb-2 flex justify-between items-center">
-               <span>
-                 {gameStatus === "LOBBY" ? "🏠 대기실" : 
-                  gameStatus === "VOTING" ? "🗳 투표 중" : 
-                  gameStatus === "LIAR_GUESS" ? "🤔 라이어의 선택" : 
-                  gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
-               </span>
-               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{players.length} Players</span>
+          {/* 메인 정보창 (스크롤 가능하도록 구조 변경) */}
+          <div className="bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden min-h-0">
+            <h2 className="text-base md:text-xl font-black mb-2 md:mb-4 border-b pb-2 flex justify-between items-center shrink-0">
+              <span>
+                {gameStatus === "LOBBY" ? "🏠 대기실" :
+                  gameStatus === "VOTING" ? "🗳 투표 중" :
+                    gameStatus === "LIAR_GUESS" ? "🤔 라이어의 선택" :
+                      gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
+              </span>
+              <span className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest">{players.length} Players</span>
             </h2>
             
-            {/* 카테고리/단어 표시창 (기존 로직 유지) */}
-            {(gameStatus === "PLAYING" || gameStatus === "VOTING" || gameStatus === "LIAR_GUESS") && myGameData && (
-              <div className="mb-4 p-4 bg-blue-50 rounded-2xl md:rounded-3xl text-center border border-blue-100 shadow-inner">
-                <p className="text-[9px] text-blue-400 font-black mb-1 uppercase tracking-widest">카테고리: {myGameData.category}</p>
-                <p className="text-2xl md:text-3xl font-black text-blue-900 tracking-tighter">{myGameData.word}</p>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-              {players.map((p) => (
-                <div key={p.id} className={`p-3 md:p-4 rounded-2xl flex justify-between items-center border-2 transition-all ${
-                  socket.id === p.id 
-                    ? "bg-slate-50 border-blue-200 shadow-md ring-2 ring-blue-100" 
-                    : currentTurnId === p.id ? "bg-amber-50 border-amber-400" : "bg-white border-slate-50"
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`font-bold text-xs md:text-sm ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
-                      {p.name} {p.isHost && "👑"}
-                    </span>
-                    {socket.id === p.id && <span className="bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase">나</span>}
-                    <span className="text-[9px] text-slate-400">({p.score}pts)</span>
-                  </div>
-                  {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
-                    <button onClick={() => handleVote(p.id)} className="bg-rose-500 text-white text-[9px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors shadow-sm uppercase">지목</button>
-                  )}
+            {/* 게임 진행 정보 영역 (내용이 많아도 리스트를 가리지 않도록 설정) */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* 카테고리/단어 표시창 (기존 로직 유지) */}
+              {(gameStatus === "PLAYING" || gameStatus === "VOTING" || gameStatus === "LIAR_GUESS") && myGameData && (
+                <div className="mb-3 p-2 md:p-4 bg-blue-50 rounded-xl md:rounded-3xl text-center border border-blue-100 shadow-inner shrink-0">
+                  <p className="text-[8px] md:text-[10px] text-blue-400 font-black mb-0.5 uppercase tracking-widest">카테고리: {myGameData.category}</p>
+                  <p className="text-xl md:text-3xl font-black text-blue-900 tracking-tighter">{myGameData.word}</p>
                 </div>
-              ))}
+              )}
+
+              {/* 플레이어 리스트: 이 부분이 내부에서 스크롤됨 */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {players.map((p) => (
+                  <div key={p.id} className={`p-3 md:p-4 rounded-xl md:rounded-2xl flex justify-between items-center border-2 transition-all ${socket.id === p.id
+                      ? "bg-slate-50 border-blue-200 shadow-md ring-1 ring-blue-100"
+                      : currentTurnId === p.id ? "bg-amber-50 border-amber-400" : "bg-white border-slate-50"
+                    }`}>
+                    <div className="flex items-center gap-2 truncate">
+                      <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
+                        {p.name} {p.isHost && "👑"}
+                      </span>
+                      {currentTurnId === p.id && gameStatus === "PLAYING" && (
+                        <span className="text-[7px] md:text-[8px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse uppercase">Turn</span>
+                      )}
+                    </div>
+                    {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
+                      <button
+                        onClick={() => handleVote(p.id)}
+                        className="bg-rose-500 text-white text-[8px] md:text-[10px] px-2.5 py-1.5 rounded-lg font-black hover:bg-rose-600 transition-colors shadow-sm uppercase shrink-0"
+                      >
+                        지목
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* 액션 버튼 영역 (기존 로직 유지) */}
-          <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0">
-            {/* ... (기존 버튼 렌더링 로직 그대로 삽입) ... */}
-            {gameStatus === "LOBBY" ? (
-                myInfo?.isHost ? (
-                    <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 md:py-5 rounded-[1.5rem] md:rounded-[1.8rem] font-black text-lg md:text-xl hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 uppercase tracking-tighter italic">게임 시작</button>
-                ) : (
-                    <button onClick={handleToggleReady} className={`w-full py-4 md:py-5 rounded-[1.5rem] md:rounded-[1.8rem] font-black text-lg md:text-xl transition-all shadow-lg ${myInfo?.isReady ? "bg-slate-200 text-slate-500 shadow-none" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100 uppercase"}`}>
-                        {myInfo?.isReady ? "준비 완료" : "준비하기"}
-                    </button>
-                )
-          ) : gameStatus === "VOTING" ? (
-            <div className="text-center py-4 bg-rose-50 rounded-2xl border-2 border-dashed border-rose-200">
-              <p className="text-rose-600 font-black uppercase tracking-widest text-sm animate-pulse">
-                {hasVoted ? `투표 완료 (${votedCount}/${players.length})` : "라이어를 지목하세요!"}
-              </p>
-            </div>
-          ) : gameStatus === "LIAR_GUESS" ? (
-            isLiar ? (
-              <form onSubmit={handleSubmitGuess} className="space-y-3">
-                <p className="text-xs font-black text-rose-500 text-center uppercase tracking-tighter">시민의 단어를 입력하세요!</p>
-                <input 
-                  type="text" 
-                  value={guessWord} 
-                  onChange={(e) => setGuessWord(e.target.value)}
-                  placeholder="정답은 무엇일까요?"
-                  className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold text-center focus:border-rose-400 transition-all"
-                />
-                <button className="w-full bg-rose-600 text-white py-4 rounded-2xl font-black hover:bg-rose-700 shadow-lg shadow-rose-100 uppercase italic">정답 제출</button>
-              </form>
-            ) : (
-              <div className="text-center py-6 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200">
-                <p className="text-blue-600 font-black uppercase tracking-widest text-sm animate-pulse italic text-[11px]">라이어가 정답을 유추 중...</p>
-              </div>
-            )
-          ) : gameStatus === "RESULT" ? (
-            myInfo?.isHost && <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[1.8rem] font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-100 uppercase italic">다시 시작</button>
-          ) : isMyTurn ? (
-            <button onClick={handleNextTurn} className="w-full bg-amber-400 text-amber-900 py-5 rounded-[1.8rem] font-black text-xl hover:bg-amber-500 animate-pulse uppercase italic border-b-4 border-amber-600">설명 완료</button>
-          ) : (
-            <div className="text-center py-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-              <p className="text-slate-400 font-black uppercase tracking-widest text-[11px] italic animate-pulse">다른 플레이어의 설명 중...</p>
-            </div>
-            )}
-          </div>
+          {/* 3. 액션 버튼 영역 (상태별 분기 완전 복구) */}
+  <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0">
+    {gameStatus === "LOBBY" ? (
+      myInfo?.isHost ? (
+        <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[1.8rem] font-black text-lg md:text-xl hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 uppercase italic">게임 시작</button>
+      ) : (
+        <button onClick={handleToggleReady} className={`w-full py-5 rounded-[1.8rem] font-black text-lg md:text-xl transition-all shadow-lg ${myInfo?.isReady ? "bg-slate-200 text-slate-500 shadow-none" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100 uppercase"}`}>
+          {myInfo?.isReady ? "준비 완료" : "준비하기"}
+        </button>
+      )
+    ) : gameStatus === "VOTING" ? (
+      <div className="text-center py-4 bg-rose-50 rounded-2xl border-2 border-dashed border-rose-200">
+        <p className="text-rose-600 font-black uppercase tracking-widest text-xs animate-pulse">
+          {hasVoted ? `투표 완료 (${votedCount}/${players.length})` : "라이어를 지목하세요!"}
+        </p>
+      </div>
+    ) : gameStatus === "LIAR_GUESS" ? (
+      isLiar ? (
+        <form onSubmit={handleSubmitGuess} className="space-y-3">
+          <p className="text-[10px] font-black text-rose-500 text-center uppercase tracking-tighter">시민의 단어를 입력하세요!</p>
+          <input 
+            type="text" 
+            value={guessWord} 
+            onChange={(e) => setGuessWord(e.target.value)}
+            placeholder="정답은 무엇일까요?"
+            className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none font-bold text-center focus:border-rose-400 transition-all text-sm"
+          />
+          <button className="w-full bg-rose-600 text-white py-3 rounded-xl font-black hover:bg-rose-700 shadow-lg uppercase italic">정답 제출</button>
+        </form>
+      ) : (
+        <div className="text-center py-6 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200">
+          <p className="text-blue-600 font-black uppercase tracking-widest text-xs animate-pulse italic">라이어가 정답 유추 중...</p>
+        </div>
+      )
+    ) : gameStatus === "RESULT" ? (
+      myInfo?.isHost && <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[1.8rem] font-black text-xl hover:bg-blue-700 shadow-xl uppercase italic">다시 시작</button>
+    ) : isMyTurn ? (
+      <button onClick={handleNextTurn} className="w-full bg-amber-400 text-amber-900 py-5 rounded-[1.8rem] font-black text-xl hover:bg-amber-500 animate-pulse uppercase italic border-b-4 border-amber-600">설명 완료</button>
+    ) : (
+      <div className="text-center py-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+        <p className="text-slate-400 font-black uppercase tracking-widest text-[10px] italic animate-pulse">다른 플레이어의 설명 중...</p>
+      </div>
+    )}
+  </div>
         </div>
 
         {/* 오른쪽 메인: 채팅창 (항상 표시되거나, 정보창이 닫혔을 때 꽉 참) */}
