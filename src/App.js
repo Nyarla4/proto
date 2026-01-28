@@ -32,6 +32,8 @@ function App() {
   const [hasVoted, setHasVoted] = useState(false);
   const [guessWord, setGuessWord] = useState("");
 
+  const [isInfoVisible, setIsInfoVisible] = useState(true);
+
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -168,84 +170,102 @@ function App() {
   const isLiar = myGameData?.role === "LIAR";
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-slate-100 p-4 gap-4 overflow-hidden text-slate-800 font-sans">
+    <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans">
+      {/* 에러 메시지 (기존과 동일) */}
       {showError && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black text-sm uppercase">
           ⚠ {showError}
         </div>
       )}
 
-      {/* 왼쪽 사이드바: 플레이어 리스트 및 정보 */}
-      <div className="w-full md:w-1/3 flex flex-col gap-4 overflow-hidden h-full">
-        {/* 프로필 정보 상단 고정 */}
-        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-4">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-inner">
-            <span className="text-2xl">👤</span>
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="font-black text-xl text-slate-900 leading-none">{name}</span>
-              <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase">Me</span>
-            </div>
-            <span className="text-slate-400 text-xs font-bold mt-1">
-              SCORE: <span className="text-blue-600">{myInfo?.score || 0}</span> | {myInfo?.isHost ? "방장 👑" : "멤버"}
-            </span>
-          </div>
-        </div>
+      {/* [추가] 모바일 전용 상단 바 (토글 버튼) */}
+      <div className="md:hidden bg-white/80 backdrop-blur-sm p-3 flex justify-between items-center border-b shrink-0 z-40">
+        <span className="font-black italic text-slate-800 tracking-tighter">🕵️ LIAR GAME</span>
+        <button 
+          onClick={() => setIsInfoVisible(!isInfoVisible)}
+          className="bg-slate-800 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform"
+        >
+          {isInfoVisible ? "HIDE INFO" : "SHOW INFO"}
+        </button>
+      </div>
 
-        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
-          <h2 className="text-xl font-black mb-4 border-b pb-2 flex justify-between items-center">
-             <span>
-               {gameStatus === "LOBBY" ? "🏠 대기실" : 
-                gameStatus === "VOTING" ? "🗳 투표 중" : 
-                gameStatus === "LIAR_GUESS" ? "🤔 라이어의 선택" : 
-                gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
-             </span>
-             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{players.length} Players</span>
-          </h2>
-          
-          {(gameStatus === "PLAYING" || gameStatus === "VOTING" || gameStatus === "LIAR_GUESS") && myGameData && (
-            <div className="mb-4 p-4 bg-blue-50 rounded-3xl text-center border border-blue-100 shadow-inner">
-              <p className="text-[10px] text-blue-400 font-black mb-1 uppercase tracking-widest">카테고리: {myGameData.category}</p>
-              <p className="text-3xl font-black text-blue-900 tracking-tighter">{myGameData.word}</p>
+      {/* 메인 컨테이너: p-4 유지, 모바일은 세로(col), PC는 가로(row) */}
+      <div className="flex flex-col md:flex-row flex-1 p-2 md:p-4 gap-2 md:gap-4 overflow-hidden">
+        
+        {/* 왼쪽 사이드바: 플레이어 리스트 및 정보 */}
+        <div className={`
+          ${isInfoVisible ? 'flex' : 'hidden'} 
+          md:flex w-full md:w-1/3 flex-col gap-2 md:gap-4 overflow-hidden h-full shrink-0
+          max-h-[45vh] md:max-h-full
+        `}>
+          {/* 프로필 정보 상단 고정 (기존 디자인 유지) */}
+          <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-4">
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-inner">
+              <span className="text-xl md:text-2xl">👤</span>
             </div>
-          )}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-lg md:text-xl text-slate-900 leading-none">{name}</span>
+                <span className="bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase">Me</span>
+              </div>
+              <span className="text-slate-400 text-[10px] md:text-xs font-bold mt-1">
+                SCORE: <span className="text-blue-600">{myInfo?.score || 0}</span> | {myInfo?.isHost ? "방장 👑" : "멤버"}
+              </span>
+            </div>
+          </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-            {players.map((p) => (
-              <div key={p.id} className={`p-4 rounded-2xl flex justify-between items-center border-2 transition-all ${
-                socket.id === p.id 
-                  ? "bg-slate-50 border-blue-200 shadow-md ring-2 ring-blue-100" 
-                  : currentTurnId === p.id ? "bg-amber-50 border-amber-400" : "bg-white border-slate-50"
-              }`}>
-                <div className="flex items-center gap-2">
-                  <span className={`font-bold text-sm ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
-                    {p.name} {p.isHost && "👑"}
-                  </span>
-                  {socket.id === p.id && <span className="bg-blue-100 text-blue-600 text-[9px] px-1.5 py-0.5 rounded-md font-black uppercase">나</span>}
-                  <span className="text-[10px] text-slate-400">({p.score}pts)</span>
-                  {currentTurnId === p.id && gameStatus === "PLAYING" && (
-                    <span className="text-[8px] bg-amber-400 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ml-1 animate-pulse">설명 중</span>
+          <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+            <h2 className="text-lg md:text-xl font-black mb-4 border-b pb-2 flex justify-between items-center">
+               <span>
+                 {gameStatus === "LOBBY" ? "🏠 대기실" : 
+                  gameStatus === "VOTING" ? "🗳 투표 중" : 
+                  gameStatus === "LIAR_GUESS" ? "🤔 라이어의 선택" : 
+                  gameStatus === "RESULT" ? "🏆 결과" : "🎮 게임 중"}
+               </span>
+               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{players.length} Players</span>
+            </h2>
+            
+            {/* 카테고리/단어 표시창 (기존 로직 유지) */}
+            {(gameStatus === "PLAYING" || gameStatus === "VOTING" || gameStatus === "LIAR_GUESS") && myGameData && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-2xl md:rounded-3xl text-center border border-blue-100 shadow-inner">
+                <p className="text-[9px] text-blue-400 font-black mb-1 uppercase tracking-widest">카테고리: {myGameData.category}</p>
+                <p className="text-2xl md:text-3xl font-black text-blue-900 tracking-tighter">{myGameData.word}</p>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+              {players.map((p) => (
+                <div key={p.id} className={`p-3 md:p-4 rounded-2xl flex justify-between items-center border-2 transition-all ${
+                  socket.id === p.id 
+                    ? "bg-slate-50 border-blue-200 shadow-md ring-2 ring-blue-100" 
+                    : currentTurnId === p.id ? "bg-amber-50 border-amber-400" : "bg-white border-slate-50"
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold text-xs md:text-sm ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
+                      {p.name} {p.isHost && "👑"}
+                    </span>
+                    {socket.id === p.id && <span className="bg-blue-100 text-blue-600 text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase">나</span>}
+                    <span className="text-[9px] text-slate-400">({p.score}pts)</span>
+                  </div>
+                  {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
+                    <button onClick={() => handleVote(p.id)} className="bg-rose-500 text-white text-[9px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors shadow-sm uppercase">지목</button>
                   )}
                 </div>
-                {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
-                  <button onClick={() => handleVote(p.id)} className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors shadow-sm shadow-rose-100 uppercase">지목</button>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* 액션 버튼 영역 */}
-        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0">
-          {gameStatus === "LOBBY" ? (
-            myInfo?.isHost ? (
-              <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-5 rounded-[1.8rem] font-black text-xl hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 uppercase tracking-tighter italic">게임 시작</button>
-            ) : (
-              <button onClick={handleToggleReady} className={`w-full py-5 rounded-[1.8rem] font-black text-xl transition-all shadow-lg ${myInfo?.isReady ? "bg-slate-200 text-slate-500 shadow-none" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100 uppercase"}`}>
-                {myInfo?.isReady ? "준비 완료" : "준비하기"}
-              </button>
-            )
+          {/* 액션 버튼 영역 (기존 로직 유지) */}
+          <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0">
+            {/* ... (기존 버튼 렌더링 로직 그대로 삽입) ... */}
+            {gameStatus === "LOBBY" ? (
+                myInfo?.isHost ? (
+                    <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 md:py-5 rounded-[1.5rem] md:rounded-[1.8rem] font-black text-lg md:text-xl hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 uppercase tracking-tighter italic">게임 시작</button>
+                ) : (
+                    <button onClick={handleToggleReady} className={`w-full py-4 md:py-5 rounded-[1.5rem] md:rounded-[1.8rem] font-black text-lg md:text-xl transition-all shadow-lg ${myInfo?.isReady ? "bg-slate-200 text-slate-500 shadow-none" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100 uppercase"}`}>
+                        {myInfo?.isReady ? "준비 완료" : "준비하기"}
+                    </button>
+                )
           ) : gameStatus === "VOTING" ? (
             <div className="text-center py-4 bg-rose-50 rounded-2xl border-2 border-dashed border-rose-200">
               <p className="text-rose-600 font-black uppercase tracking-widest text-sm animate-pulse">
@@ -278,60 +298,46 @@ function App() {
             <div className="text-center py-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
               <p className="text-slate-400 font-black uppercase tracking-widest text-[11px] italic animate-pulse">다른 플레이어의 설명 중...</p>
             </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* 오른쪽 메인: 채팅창 */}
-      <div className="flex-1 bg-white rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full">
-        <div className="p-5 border-b border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
-          <h3 className="font-black text-slate-800 tracking-tight italic uppercase text-sm flex items-center gap-2">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full"></span> Live Chat
-          </h3>
-          {gameStatus === "RESULT" && gameResult && (
-            <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${gameResult.voteSuccess ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-              검거: {gameResult.voteSuccess ? "성공" : "실패"} | 라이어 답: {gameResult.guessSuccess ? "정답" : "오답"}
-            </span>
-          )}
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/10">
-          {gameStatus === "RESULT" && gameResult && (
-            <div className="mb-6 p-6 bg-white border-4 border-blue-500 rounded-[2rem] text-center shadow-xl animate-in zoom-in duration-300">
-              <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-widest italic">The Liar was...</p>
-              <h3 className="text-4xl font-black text-slate-800 mb-2 tracking-tight italic">{gameResult.liar.name}</h3>
-              <p className="font-bold text-blue-600 uppercase text-xs mb-4">정답 단어: {gameResult.liar.word}</p>
-              <div className="inline-block px-8 py-3 bg-blue-600 text-white rounded-2xl font-black italic uppercase tracking-tighter">
-                Game Over
-              </div>
-            </div>
-          )}
+        {/* 오른쪽 메인: 채팅창 (항상 표시되거나, 정보창이 닫혔을 때 꽉 참) */}
+        <div className="flex-1 bg-white rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full min-h-0">
+          <div className="p-4 md:p-5 border-b border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
+            <h3 className="font-black text-slate-800 tracking-tight italic uppercase text-xs md:text-sm flex items-center gap-2">
+              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span> Live Chat
+            </h3>
+          </div>
           
-          {chatLog.map((chat) => (
-            <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : "items-start"}`}>
-              <span className={`text-[10px] font-black mb-1 px-2 uppercase tracking-tighter ${chat.author === 'SYSTEM' ? 'text-blue-500' : 'text-slate-400'}`}>
-                {chat.author === name ? "Me" : chat.author}
-              </span>
-              <div className={`px-5 py-3 rounded-[1.5rem] max-w-[85%] break-all shadow-sm font-medium text-sm ${
-                chat.author === 'SYSTEM' ? "bg-slate-800 text-white mx-auto text-center rounded-2xl text-[12px] py-2" :
-                chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
-              }`}>
-                {chat.message}
-              </div>
-            </div>
-          ))}
-          <div ref={chatEndRef} />
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/10">
+             {/* 채팅 로그 맵핑 (기존 코드와 동일) */}
+             {chatLog.map((chat) => (
+                <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : "items-start"}`}>
+                  <span className={`text-[9px] font-black mb-1 px-2 uppercase tracking-tighter ${chat.author === 'SYSTEM' ? 'text-blue-500' : 'text-slate-400'}`}>
+                    {chat.author === name ? "Me" : chat.author}
+                  </span>
+                  <div className={`px-4 py-2 md:px-5 md:py-3 rounded-[1.2rem] md:rounded-[1.5rem] max-w-[85%] break-all shadow-sm font-medium text-sm ${
+                    chat.author === 'SYSTEM' ? "bg-slate-800 text-white mx-auto text-center rounded-2xl text-[11px] py-1.5" :
+                    chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
+                  }`}>
+                    {chat.message}
+                  </div>
+                </div>
+              ))}
+            <div ref={chatEndRef} />
+          </div>
+          
+          <form onSubmit={handleSendMessage} className="p-4 md:p-6 bg-white border-t border-slate-50 flex gap-2 md:gap-3 shrink-0">
+            <input
+              className="flex-1 p-3 md:p-4 bg-slate-50 rounded-xl md:rounded-2xl outline-none font-bold text-slate-700 placeholder:text-slate-300 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm"
+              placeholder="메시지..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+            <button className="bg-blue-600 text-white px-5 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-50 uppercase tracking-tighter italic text-sm">Send</button>
+          </form>
         </div>
-        
-        <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-50 flex gap-3 shrink-0">
-          <input
-            className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-700 placeholder:text-slate-300 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm"
-            placeholder="메시지를 입력하세요..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <button className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-50 uppercase tracking-tighter italic">Send</button>
-        </form>
       </div>
     </div>
   );
