@@ -1,31 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 
-/**
- * 서버 주소 설정
- */
 const socket = io("http://localhost:3001", { transports: ["websocket"] });
 
 function App() {
-  // 스타일 로드 보강 (로비 화면 디자인 적용 문제 해결 시도)
-  useEffect(() => {
-    const scriptId = "tailwind-cdn";
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://cdn.tailwindcss.com";
-      document.head.appendChild(script);
-    }
-  }, []);
-
-  // --- 상태 관리 (State) ---
-  const [name, setName] = useState("");         // 사용자의 닉네임
-  const [isJoined, setIsJoined] = useState(false); // 입장 여부
-  const [players, setPlayers] = useState([]);     // 접속자 목록
-  const [message, setMessage] = useState("");     // 입력 중인 메시지
-  const [chatLog, setChatLog] = useState([]);     // 채팅 기록
-
-  // --- 소켓 상태 및 게임 데이터 ---
+  const [name, setName] = useState("");
+  const [isJoined, setIsJoined] = useState(false);
+  const [players, setPlayers] = useState([]);
+  const [message, setMessage] = useState("");
+  const [chatLog, setChatLog] = useState([]);
   const [isConnected, setIsConnected] = useState(socket.connected);
   
   const [gameStatus, setGameStatus] = useState("LOBBY");
@@ -38,14 +21,27 @@ function App() {
   const [hasVoted, setHasVoted] = useState(false);
   const [guessWord, setGuessWord] = useState("");
 
-  const chatEndRef = useRef(null); // 채팅창 하단 자동 스크롤
+  const chatEndRef = useRef(null);
 
   useEffect(() => {
+    const scriptId = "tailwind-cdn";
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://cdn.tailwindcss.com";
+      document.head.appendChild(script);
+    }
+
     socket.on("connect", () => setIsConnected(true));
     socket.on("disconnect", () => setIsConnected(false));
     socket.on("update_players", (data) => setPlayers(data));
     socket.on("receive_message", (data) => setChatLog((prev) => [...prev, data]));
-    socket.on("join_success", () => setIsJoined(true));
+    
+    // 입장 성공시에만 화면 전환
+    socket.on("join_success", () => {
+      setIsJoined(true);
+      setShowError("");
+    });
     
     socket.on("game_start_info", (data) => {
       setMyGameData(data);
@@ -67,6 +63,8 @@ function App() {
 
     socket.on("game_error", (msg) => {
       setShowError(msg);
+      // 에러가 발생하면 입장 상태를 false로 유지 (확실히 하기 위함)
+      setIsJoined(false);
       setTimeout(() => setShowError(""), 3000);
     });
 
@@ -89,7 +87,9 @@ function App() {
 
   const handleJoin = (e) => {
     e.preventDefault();
-    if (name.trim()) socket.emit("join_room", name);
+    if (name.trim()) {
+      socket.emit("join_room", name);
+    }
   };
 
   const handleSendMessage = (e) => {
@@ -121,9 +121,15 @@ function App() {
     }
   };
 
+  // 입장 전 화면 (타이틀 화면)
   if (!isJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 relative">
+        {showError && (
+          <div className="absolute top-10 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black text-sm uppercase">
+            ⚠ {showError}
+          </div>
+        )}
         <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md border border-slate-200 text-center flex flex-col gap-8 transition-all">
           <div>
             <h1 className="text-5xl font-black text-blue-600 tracking-tighter italic uppercase mb-2">Liar Game</h1>
@@ -157,12 +163,14 @@ function App() {
     );
   }
 
+  // 입장 후 게임 화면
   const myInfo = players.find(p => p.id === socket.id);
   const isMyTurn = currentTurnId === socket.id;
   const isLiar = myGameData?.role === "LIAR";
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-100 p-4 gap-4 overflow-hidden text-slate-800">
+      {/* 게임 내부 알림 */}
       {showError && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black text-sm uppercase">
           ⚠ {showError}
@@ -205,7 +213,6 @@ function App() {
           </div>
         </div>
 
-        {/* 액션 버튼 영역 (수정된 핵심 로직) */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0">
           {gameStatus === "LOBBY" ? (
             myInfo?.isHost ? (
@@ -251,7 +258,6 @@ function App() {
         </div>
       </div>
 
-      {/* 오른쪽 메인: 채팅창 */}
       <div className="flex-1 bg-white rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full">
         <div className="p-5 border-b border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
           <h3 className="font-black text-slate-800 tracking-tight italic uppercase text-sm">Live Chat</h3>

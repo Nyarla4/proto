@@ -36,9 +36,14 @@ let gameState = {
 
 io.on('connection', (socket) => {
   socket.on('join_room', (userName) => {
+    // 1. 중복 체크를 가장 먼저 수행
     const isDuplicate = gameState.players.some(p => p.name === userName);
-    if (isDuplicate) return socket.emit('game_error', '이미 사용 중인 닉네임입니다.');
+    if (isDuplicate) {
+      // 2. 에러 발생 시 특정 에러 코드를 보냄
+      return socket.emit('game_error', '이미 사용 중인 닉네임입니다.');
+    }
 
+    // 3. 중복이 아닐 때만 플레이어 추가 및 성공 알림
     const isHost = gameState.players.length === 0;
     gameState.players.push({
       id: socket.id,
@@ -50,6 +55,7 @@ io.on('connection', (socket) => {
       votedFor: '',
       score: 0
     });
+    
     socket.emit('join_success');
     io.emit('update_players', gameState.players);
   });
@@ -123,7 +129,6 @@ io.on('connection', (socket) => {
         const mostVotedId = sortedVotes[0][0];
         const liar = gameState.players.find(p => p.role === 'LIAR');
 
-        // 투표 결과 즉시 공개 (요청 사항)
         io.emit('receive_message', { 
           id: 'sys', 
           author: 'SYSTEM', 
@@ -187,11 +192,8 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     const disconnectedPlayer = gameState.players.find(p => p.id === socket.id);
-    
-    // 라이어가 정답 맞추는 도중 탈주한 경우 처리 (요청 사항)
     if (disconnectedPlayer && disconnectedPlayer.role === 'LIAR' && gameState.status === 'LIAR_GUESS') {
       io.emit('receive_message', { id: 'sys', author: 'SYSTEM', message: '라이어가 도망갔습니다! 시민의 승리입니다.' });
-      
       gameState.players.forEach(p => { if (p.role === 'CITIZEN') p.score += 1; });
       gameState.status = 'RESULT';
       io.emit('game_result', {
@@ -202,22 +204,16 @@ io.on('connection', (socket) => {
       });
       io.emit('update_game_status', 'RESULT');
     }
-
     gameState.players = gameState.players.filter(p => p.id !== socket.id);
-    
-    // 방장 퇴장 시 처리
     if (gameState.players.length > 0 && !gameState.players.some(p => p.isHost)) {
       gameState.players[0].isHost = true;
       gameState.players[0].isReady = true;
     }
-    
-    // 게임 인원 부족 시 로비로 강제 이동 (선택 사항)
     if (gameState.players.length < 3 && gameState.status !== 'LOBBY' && gameState.status !== 'RESULT') {
       gameState.status = 'LOBBY';
       io.emit('update_game_status', 'LOBBY');
       io.emit('receive_message', { id: 'sys', author: 'SYSTEM', message: '인원 부족으로 게임이 중단되었습니다.' });
     }
-
     io.emit('update_players', gameState.players);
   });
 });
