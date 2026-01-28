@@ -1,7 +1,18 @@
 import React, { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3001", { transports: ["websocket"] });
+/**
+ * [수정 후]
+ * 로컬 환경(localhost)일 때는 3001 포트를 바라보고,
+ * 배포 환경일 때는 현재 브라우저의 도메인(origin)을 그대로 사용합니다.
+ */
+const SOCKET_URL = window.location.hostname === 'localhost' 
+  ? "http://localhost:3001" 
+  : window.location.origin;
+
+const socket = io(SOCKET_URL, {
+  transports: ["websocket"] // 배포 환경의 안정성을 위해 권장
+});
 
 function App() {
   const [name, setName] = useState("");

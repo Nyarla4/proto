@@ -2,9 +2,17 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 app.use(cors());
+
+/**
+ * [배포 핵심 1: 정적 파일 경로 설정]
+ * 리액트 빌드 결과물인 build 폴더를 서버가 읽을 수 있도록 연결합니다.
+ * server/index.js 위치 기준으로 상위 폴더의 build를 바라봅니다.
+ */
+app.use(express.static(path.join(__dirname, '../build')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -279,4 +287,20 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(3001, () => console.log('Server running on 3001'));
+/**
+ * [배포 핵심 2: 와일드카드 라우팅 해결 - 최종 수정]
+ * 문자열 대신 정규식 을 직접 사용하면 PathError를 완벽하게 회피할 수 있습니다.
+ * 모든 GET 요청에 대해 리액트의 빌드 결과물인 index.html을 반환합니다.
+ */
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../build/index.html'));
+});
+
+/**
+ * [배포 핵심 3: 동적 포트 설정]
+ * Render.com 같은 배포 서비스는 환경 변수로 포트를 제공하므로 process.env.PORT가 필수입니다.
+ */
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
