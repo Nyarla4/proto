@@ -252,24 +252,45 @@ function App() {
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {players.map((p) => (
-                  <div key={p.id} className={`p-3 md:p-4 rounded-xl flex justify-between items-center border-2 transition-all ${
-                    currentTurnId === p.id ? "bg-amber-50 border-amber-400 shadow-sm" : "bg-white border-slate-50"
-                  } ${socket.id === p.id ? "ring-1 ring-blue-400" : ""}`}>
+                  <div key={p.id}
+                    className={`p-3 md:p-4 rounded-xl flex justify-between items-center border-2 transition-all ${currentTurnId === p.id ? "bg-amber-50 border-amber-400 shadow-sm" : "bg-white border-slate-50"
+                      } ${socket.id === p.id ? "ring-1 ring-blue-400" : ""}`}
+                  >
                     <div className="flex items-center gap-2 truncate">
-                      <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
-                        {p.name} {p.isHost && "👑"}
-                      </span>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                      {/* 이름 섹션 */}
+                      <div className="flex items-center gap-1.5 truncate">
+                        {p.isHost && <span className="text-xs" title="방장">👑</span>}
+                        <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
+                          {p.name}
+                        </span>
+                      </div>
+
+                      {/* 점수 표시 (기존 스타일 유지) */}
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
                         {p.score || 0}pt
                       </span>
+
+                      {/* 게임 중 턴 표시 */}
                       {currentTurnId === p.id && gameStatus === "PLAYING" && (
-                        <span className="text-[8px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse uppercase">Turn</span>
+                        <span className="text-[8px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse uppercase shrink-0">Turn</span>
+                      )}
+
+                      {/* 준비 상태 표시: LOBBY 단계에서만 노출 (추천) */}
+                      {gameStatus === "LOBBY" && !p.isHost && (
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border ${p.isReady
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                            : "bg-slate-50 border-slate-200 text-slate-400"
+                          }`}>
+                          {p.isReady ? "Ready" : "Wait"}
+                        </span>
                       )}
                     </div>
+
+                    {/* 우측 액션: 투표 버튼 */}
                     {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
                       <button
                         onClick={() => handleVote(p.id)}
-                        className="bg-rose-500 text-white text-[10px] px-3 py-1 rounded-lg font-black hover:bg-rose-600 transition-colors uppercase shadow-sm"
+                        className="bg-rose-500 text-white text-[10px] px-3 py-1 rounded-lg font-black hover:bg-rose-600 transition-colors uppercase shadow-sm shrink-0"
                       >
                         지목
                       </button>
