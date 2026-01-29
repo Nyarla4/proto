@@ -218,10 +218,10 @@ io.on('connection', (socket) => {
 
     if (isCorrect) {
       liar.score += 1;
-      io.to(roomId).emit('chat-message', { id: 'sys-ans-ok', author: 'SYSTEM', message: `라이어가 정답 [${room.citizenWord}]을(를) 맞혔습니다!` });
+      io.to(roomId).emit('chat-message', { id: 'sys-ans-ok', author: 'SYSTEM', message: `라이어가 정답을 맞혔습니다! 라이어의 단어는 [${room.liarWord}], 시민의 단어는 [${room.citizenWord}]였습니다.` });
     } else {
       room.players.forEach(p => { if (p.role === 'CITIZEN') p.score += 1; });
-      io.to(roomId).emit('chat-message', { id: 'sys-ans-no', author: 'SYSTEM', message: `라이어가 정답을 맞히지 못했습니다. 시민의 단어는 [${room.citizenWord}]였습니다!` });
+      io.to(roomId).emit('chat-message', { id: 'sys-ans-no', author: 'SYSTEM', message: `라이어가 정답을 맞히지 못했습니다. 라이어의 단어는 [${room.liarWord}], 시민의 단어는 [${room.citizenWord}]였습니다.` });
     }
 
     room.status = 'RESULT';

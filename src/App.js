@@ -286,7 +286,7 @@ function App() {
                 <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 uppercase italic">게임 시작</button>
               ) : (
                 <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
-                  {myInfo?.isReady ? "READY OK" : "READY"}
+                  {myInfo?.isReady ? "준비완료" : "준비"}
                 </button>
               )
             ) : gameStatus === "VOTING" ? (
