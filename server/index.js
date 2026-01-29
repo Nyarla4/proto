@@ -99,6 +99,49 @@ const processVoteResults = (roomId) => {
   room.status = 'LIAR_GUESS';
   io.to(roomId).emit('update-game-status', 'LIAR_GUESS');
   io.to(roomId).emit('update-players', room.players);
+  
+  // --- [수정] 라이어 정답 추리 타이머 시작 (예: 15초) ---
+  startTimer(roomId, 15, () => {
+    // 시간 초과 시 실행될 콜백
+    if (room.status === 'LIAR_GUESS') {
+      io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ 라이어의 정답 제출 시간이 초과되었습니다!` });
+      // 빈 값이나 특수 키워드를 보내 오답 처리 로직 실행
+      handleGuessResult(roomId, "TIME_UP_NO_ANSWER");
+    }
+  });
+
+};
+
+// --- [추가] 정답 확인 및 결과 발표 공통 로직 ---
+const handleGuessResult = (roomId, guess) => {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  stopTimer(roomId); // 정답 제출 혹은 시간 초과 시 타이머 중지
+
+  const liar = room.players.find(p => p.role === 'LIAR');
+  if (!liar) return;
+
+  const isCorrect = guess.trim() === room.citizenWord;
+  room.roundResults.guessSuccess = isCorrect;
+
+  if (isCorrect) {
+    liar.score += 1;
+    io.to(roomId).emit('chat-message', { id: 'sys-ans-ok', author: 'SYSTEM', message: `라이어가 정답 [${room.citizenWord}]을 맞혔습니다! 시민 패배!` });
+  } else {
+    room.players.forEach(p => { if (p.role === 'CITIZEN') p.score += 1; });
+    io.to(roomId).emit('chat-message', { id: 'sys-ans-no', author: 'SYSTEM', message: `라이어가 정답을 맞히지 못했습니다. 시민의 단어는 [${room.citizenWord}]였습니다!` });
+  }
+
+  room.status = 'RESULT';
+  io.to(roomId).emit('game-result', {
+    voteSuccess: room.roundResults.voteSuccess,
+    guessSuccess: isCorrect,
+    liar: { name: liar.name, word: room.citizenWord },
+    votes: room.votes
+  });
+  io.to(roomId).emit('update-game-status', 'RESULT');
+  io.to(roomId).emit('update-players', room.players);
 };
 
 io.on('connection', (socket) => {
@@ -293,31 +336,7 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room || room.status !== 'LIAR_GUESS') return;
 
-    stopTimer(roomId); // 라이어 정답 제출 시 타이머 중지
-
-    const liar = room.players.find(p => p.id === socket.id);
-    if (!liar || liar.role !== 'LIAR') return;
-
-    const isCorrect = guess.trim() === room.citizenWord;
-    room.roundResults.guessSuccess = isCorrect;
-
-    if (isCorrect) {
-      liar.score += 1;
-      io.to(roomId).emit('chat-message', { id: 'sys-ans-ok', author: 'SYSTEM', message: `라이어가 정답을 맞혔습니다! 라이어의 단어는 [${room.liarWord}], 시민의 단어는 [${room.citizenWord}]였습니다.` });
-    } else {
-      room.players.forEach(p => { if (p.role === 'CITIZEN') p.score += 1; });
-      io.to(roomId).emit('chat-message', { id: 'sys-ans-no', author: 'SYSTEM', message: `라이어가 정답을 맞히지 못했습니다. 라이어의 단어는 [${room.liarWord}], 시민의 단어는 [${room.citizenWord}]였습니다.` });
-    }
-
-    room.status = 'RESULT';
-    io.to(roomId).emit('game-result', {
-      voteSuccess: room.roundResults.voteSuccess,
-      guessSuccess: isCorrect,
-      liar: { name: liar.name, word: room.citizenWord },
-      votes: room.votes
-    });
-    io.to(roomId).emit('update-game-status', 'RESULT');
-    io.to(roomId).emit('update-players', room.players);
+    handleGuessResult(roomId, guess);
   });
 
   socket.on('toggle-ready', () => {

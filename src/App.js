@@ -39,15 +39,14 @@ function App() {
   const chatEndRef = useRef(null);
   // ref를 사용하여 handleNextTurn 내부의 최신 상태값에 접근 (타이머 0초 시 자동 전송용)
   const descInputRef = useRef("");
+  const guessWordRef = useRef(""); // 라이어 정답 참조용 추가
   const currentTurnIdRef = useRef("");
+  const gameStatusRef = useRef("LOBBY");
 
-  useEffect(() => {
-    descInputRef.current = descInput;
-  }, [descInput]);
-
-  useEffect(() => {
-    currentTurnIdRef.current = currentTurnId;
-  }, [currentTurnId]);
+  useEffect(() => { descInputRef.current = descInput; }, [descInput]);
+  useEffect(() => { guessWordRef.current = guessWord; }, [guessWord]);
+  useEffect(() => { currentTurnIdRef.current = currentTurnId; }, [currentTurnId]);
+  useEffect(() => { gameStatusRef.current = gameStatus; }, [gameStatus]);
 
   useEffect(() => {
     const scriptId = "tailwind-cdn";
@@ -88,9 +87,19 @@ function App() {
       
       // 누락된 부분: 시간이 0이 되었을 때 내 턴이라면 자동 전송 혹은 초기화 로직
       if (time === 0) {
-        if (currentTurnIdRef.current === socket.id && gameStatus === "PLAYING") {
-          // 서버에서 자동으로 넘기겠지만, 클라이언트에서도 입력값을 비워주는 처리가 필요함
+        // 1. 일반 설명 단계 시간 초과
+        if (gameStatusRef.current === "PLAYING" && currentTurnIdRef.current === socket.id) {
+          // 시간이 다 되면 현재까지 입력한 내용이라도 강제 제출 (서버에서 다음 턴으로 넘김)
+          socket.emit("next-turn", descInputRef.current || "시간 초과로 설명을 건너뜁니다.");
           setDescInput(""); 
+        }
+        // 2. 라이어 정답 제출 단계 시간 초과
+        if (gameStatusRef.current === "LIAR_GUESS" && myGameData?.role === "LIAR") {
+          // 라이어가 0초까지 정답을 못 적으면 오답 처리 유도
+          if (!guessWordRef.current) {
+            socket.emit("submit-guess", "TIME_UP_NO_ANSWER");
+          }
+          setGuessWord("");
         }
       }
     });
@@ -98,6 +107,7 @@ function App() {
     socket.on("game-result", (result) => {
       setGameResult(result);
       setGameStatus("RESULT");
+      setTimeLeft(0); // 결과창 진입 시 타이머 초기화 (잔상 제거)
     });
 
     socket.on("error-message", (msg) => {
@@ -226,6 +236,9 @@ function App() {
   const isMyTurn = currentTurnId === socket.id;
   const isLiar = myGameData?.role === "LIAR";
 
+  // 타이머가 표시되어야 하는 상태인지 확인
+  const isTimerActive = ["PLAYING", "VOTING", "LIAR_GUESS"].includes(gameStatus);
+
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans">
       {showError && (
@@ -263,8 +276,9 @@ function App() {
                 SCORE: <span className="text-blue-600">{myInfo?.score || 0}</span> | {myInfo?.isHost ? "HOST 👑" : "MEMBER"}
               </span>
             </div>
-            {gameStatus !== "LOBBY" && gameStatus !== "RESULT" && (
-              <div className={`ml-auto px-3 py-1 rounded-xl border-2 font-black text-sm md:text-lg ${timeLeft <= 5 ? 'bg-rose-50 border-rose-400 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+            {/* 상시 타이머 (정답 제출 단계 포함) */}
+            {isTimerActive && (
+              <div className={`ml-auto px-4 py-2 rounded-2xl border-2 font-black text-xl ${timeLeft <= 5 ? 'bg-rose-50 border-rose-400 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                 {timeLeft}s
               </div>
             )}
@@ -356,7 +370,7 @@ function App() {
                   <button className="w-full bg-rose-600 text-white py-3 rounded-xl font-black hover:bg-rose-700 shadow-lg uppercase italic">정답 제출</button>
                 </form>
               ) : (
-                <div className="text-center py-4 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 text-blue-600 font-black text-xs animate-pulse">LIAR IS GUESSING...</div>
+                <div className="text-center py-4 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 text-blue-600 font-black text-xs animate-pulse">LIAR IS GUESSING... ({timeLeft}s)</div>
               )
             ) : gameStatus === "RESULT" ? (
               myInfo?.isHost ? (
