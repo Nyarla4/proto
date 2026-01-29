@@ -160,6 +160,17 @@ function App() {
     }
   };
 
+  const handleGuessInputChange = (e) => {
+    const val = e.target.value;
+    setGuessWord(val); // 로컬 상태 업데이트
+
+    // 라이어 정답 추리 단계(LIAR_GUESS)일 때만 서버에 실시간 입력값 전송
+    // (보통 클라이언트의 gameStatus 상태값이 'LIAR_GUESS'인지 체크하면 됩니다)
+    if (gameStatus === 'LIAR_GUESS') {
+      socket.emit("update-input", val);
+    }
+  };
+
   const handleNextTurn = (e) => {
     if (e) e.preventDefault();
     if (!descInput.trim()) {
@@ -361,7 +372,7 @@ function App() {
                   <input
                     type="text"
                     value={guessWord}
-                    onChange={(e) => setGuessWord(e.target.value)}
+                    onChange={handleGuessInputChange}
                     placeholder="시민의 단어를 입력하세요"
                     className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none font-bold text-center focus:border-rose-400 transition-all text-sm"
                   />

@@ -102,12 +102,22 @@ const processVoteResults = (roomId) => {
   
   // --- [수정] 라이어 정답 추리 타이머 시작 (예: 15초) ---
   startTimer(roomId, 15, () => {
-    // 시간 초과 시 실행될 콜백
     if (room.status === 'LIAR_GUESS') {
-      io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ 라이어의 정답 제출 시간이 초과되었습니다!` });
-      // 빈 값이나 특수 키워드를 보내 오답 처리 로직 실행
-      handleGuessResult(roomId, "TIME_UP_NO_ANSWER");
-    }
+    // 1. 현재 방에서 라이어 역할을 가진 플레이어를 찾습니다.
+    const currentLiar = room.players.find(p => p.role === 'LIAR');
+    
+    // 2. 해당 플레이어가 실시간으로 보내온 currentInput 값을 가져옵니다. (없으면 빈 문자열)
+    const lastInput = currentLiar ? currentLiar.currentInput : "";
+    
+    // 3. 사용자들에게 알림을 보냅니다.
+    io.to(roomId).emit('chat-message', { 
+      author: 'SYSTEM', 
+      message: `⏰ 시간이 초과되었습니다! 최종 입력값 [${lastInput || "없음"}]으로 정답을 판정합니다.` 
+    });
+    
+    // 4. 기존에 만들어둔 판정 함수에 해당 입력값을 넣어 결과 처리
+    handleGuessResult(roomId, lastInput);
+  }
   });
 
 };
@@ -122,7 +132,9 @@ const handleGuessResult = (roomId, guess) => {
   const liar = room.players.find(p => p.role === 'LIAR');
   if (!liar) return;
 
-  const isCorrect = guess.trim() === room.citizenWord;
+  // 입력값의 앞뒤 공백을 제거하고 시민 단어와 비교합니다.
+  const finalGuess = (guess || "").trim();
+  const isCorrect = finalGuess === room.citizenWord;
   room.roundResults.guessSuccess = isCorrect;
 
   if (isCorrect) {
