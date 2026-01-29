@@ -96,9 +96,7 @@ function App() {
         // 2. 라이어 정답 제출 단계 시간 초과
         if (gameStatusRef.current === "LIAR_GUESS" && myGameData?.role === "LIAR") {
           // 라이어가 0초까지 정답을 못 적으면 오답 처리 유도
-          if (!guessWordRef.current) {
-            socket.emit("submit-guess", "TIME_UP_NO_ANSWER");
-          }
+          socket.emit("submit-guess", guessWordRef.current || "시간 초과");
           setGuessWord("");
         }
       }
