@@ -26,28 +26,65 @@ const wordDb = {
 
 const rooms = {};
 
+// --- [추가] 타이머 관리 유틸리티 ---
+const startTimer = (roomId, duration, onTimeUp) => {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  if (room.timer) clearInterval(room.timer);
+
+  room.timeLeft = duration;
+  io.to(roomId).emit('timer-tick', room.timeLeft);
+
+  room.timer = setInterval(() => {
+    room.timeLeft--;
+    io.to(roomId).emit('timer-tick', room.timeLeft);
+
+    if (room.timeLeft <= 0) {
+      clearInterval(room.timer);
+      room.timer = null;
+      onTimeUp();
+    }
+  }, 1000);
+};
+
+const stopTimer = (roomId) => {
+  const room = rooms[roomId];
+  if (room && room.timer) {
+    clearInterval(room.timer);
+    room.timer = null;
+  }
+};
+// --------------------------------
+
 const processVoteResults = (roomId) => {
   const room = rooms[roomId];
   if (!room) return;
 
-  const sortedVotes = Object.entries(room.votes).sort((a, b) => b[1] - a[1]);
-  if (sortedVotes.length === 0) return;
+  stopTimer(roomId);
 
-  const mostVotedId = sortedVotes[0][0];
+  const sortedVotes = Object.entries(room.votes).sort((a, b) => b[1] - a[1]);
+
+  // 미투표자 기권 처리로 인해 표가 아예 없을 수도 있음
+  let mostVotedId = null;
+  if (sortedVotes.length > 0 && sortedVotes[0][1] > 0) {
+    mostVotedId = sortedVotes[0][0];
+  }
+
   const liar = room.players.find(p => p.role === 'LIAR');
   const votedUser = room.players.find(p => p.id === mostVotedId);
 
-  io.to(roomId).emit('chat-message', { 
-    id: 'sys-' + Date.now(), 
-    author: 'SYSTEM', 
-    message: `투표 결과: 가장 많은 표를 받은 사람은 [${votedUser ? votedUser.name : '알 수 없음'}]입니다!` 
+  io.to(roomId).emit('chat-message', {
+    id: 'sys-' + Date.now(),
+    author: 'SYSTEM',
+    message: `투표 결과: 가장 많은 표를 받은 사람은 [${votedUser ? votedUser.name : '알 수 없음'}]입니다!`
   });
 
   if (liar) {
-    io.to(roomId).emit('chat-message', { 
-      id: 'sys-liar-' + Date.now(), 
-      author: 'SYSTEM', 
-      message: `실제 라이어는 [${liar.name}]였습니다!` 
+    io.to(roomId).emit('chat-message', {
+      id: 'sys-liar-' + Date.now(),
+      author: 'SYSTEM',
+      message: `실제 라이어는 [${liar.name}]였습니다!`
     });
 
     if (mostVotedId === liar.id) {
@@ -77,6 +114,8 @@ io.on('connection', (socket) => {
         currentTurnIndex: 0,
         votes: {},
         votedCount: 0,
+        timeLeft: 0,    // [추가]
+        timer: null,    // [추가]
         roundResults: { voteSuccess: false, guessSuccess: false }
       };
     }
@@ -97,7 +136,8 @@ io.on('connection', (socket) => {
       role: '',
       word: '',
       votedFor: '',
-      score: 0
+      score: 0,
+      currentInput: '' // [추가] 실시간 입력값 저장용
     };
 
     room.players.push(newPlayer);
@@ -108,6 +148,14 @@ io.on('connection', (socket) => {
       author: 'SYSTEM',
       message: `${name}님이 입장하셨습니다.`
     });
+  });
+
+  // [추가] 클라이언트에서 입력 중인 텍스트 수신
+  socket.on('update-input', (text) => {
+    const room = rooms[socket.roomId];
+    if (!room) return;
+    const player = room.players.find(p => p.id === socket.id);
+    if (player) player.currentInput = text;
   });
 
   socket.on('send-message', ({ roomId, message }) => {
@@ -122,6 +170,47 @@ io.on('connection', (socket) => {
       author: player.name
     });
   });
+
+  // --- [수정] 턴 전환 로직을 함수로 분리 (시간 초과 시 재사용 위함) ---
+  const handleNextTurnInternal = (roomId, targetSocket, description) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    stopTimer(roomId);
+    const player = room.players.find(p => p.id === room.turnOrder[room.currentTurnIndex]);
+
+    if (description && description.trim()) {
+      io.to(roomId).emit('chat-message', {
+        id: 'desc-' + Date.now(),
+        author: 'SYSTEM_DESC',
+        message: `📢 [설명] ${player.name}: "${description}"`
+      });
+    }
+
+    room.currentTurnIndex++;
+    if (room.currentTurnIndex < room.turnOrder.length) {
+      const nextPlayerId = room.turnOrder[room.currentTurnIndex];
+      io.to(roomId).emit('update-turn', nextPlayerId);
+
+      // 다음 사람 타이머 시작
+      startTimer(roomId, 30, () => {
+        const p = room.players.find(player => player.id === nextPlayerId);
+        const forcedDesc = p ? (p.currentInput || "(시간 초加)") : "";
+        io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ [${p?.name}]님 시간 초과!` });
+        handleNextTurnInternal(roomId, targetSocket, forcedDesc);
+      });
+    } else {
+      room.status = 'VOTING';
+      io.to(roomId).emit('update-game-status', 'VOTING');
+      io.to(roomId).emit('chat-message', { id: 'sys-vote', author: 'SYSTEM', message: '설명이 끝났습니다. 라이어를 투표해주세요!' });
+
+      // 투표 타이머 시작
+      startTimer(roomId, 20, () => {
+        io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ 투표 시간이 종료되었습니다. 미투표자는 기권 처리됩니다.` });
+        processVoteResults(roomId);
+      });
+    }
+  };
 
   socket.on('start-game', (roomId) => {
     const room = rooms[roomId];
@@ -151,13 +240,26 @@ io.on('connection', (socket) => {
       p.role = isLiar ? 'LIAR' : 'CITIZEN';
       p.word = isLiar ? liarWord : citizenWord;
       p.votedFor = '';
+      p.currentInput = '';
       io.to(p.id).emit('game-start', { role: p.role, word: p.word, category: categoryName });
     });
 
     io.to(roomId).emit('update-game-status', 'PLAYING');
-    io.to(roomId).emit('update-turn', room.turnOrder[room.currentTurnIndex]);
+    //io.to(roomId).emit('update-turn', room.turnOrder[room.currentTurnIndex]);
     io.to(roomId).emit('update-players', room.players);
     io.to(roomId).emit('chat-message', { id: 'sys-start', author: 'SYSTEM', message: '게임을 시작합니다! 순서대로 단어를 설명해주세요.' });
+
+    // [수정된 부분] 첫 번째 플레이어 턴 전송 및 타이머 시작
+    const firstPlayerId = room.turnOrder[0];
+    io.to(roomId).emit('update-turn', firstPlayerId);
+    
+    startTimer(roomId, 30, () => {
+      const p = room.players.find(player => player.id === firstPlayerId);
+      // 현재 입력 중인 내용이 있다면 그것을 사용, 없다면 "(시간 초과)" 메시지
+      const forcedDesc = p ? (p.currentInput || "(시간 초과)") : "";
+      io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ [${p?.name}]님 시간 초과!` });
+      handleNextTurnInternal(roomId, socket, forcedDesc);
+    });
   });
 
   // 4. 턴 넘기기 (설명 내용 포함 버전으로 수정)
@@ -165,26 +267,7 @@ io.on('connection', (socket) => {
     const roomId = socket.roomId;
     const room = rooms[roomId];
     if (!room || socket.id !== room.turnOrder[room.currentTurnIndex]) return;
-
-    const player = room.players.find(p => p.id === socket.id);
-
-    // 설명이 있을 경우 채팅창에 공식적으로 노출
-    if (description && description.trim()) {
-        io.to(roomId).emit('chat-message', {
-            id: 'desc-' + Date.now(),
-            author: 'SYSTEM_DESC', // 특수 타입 부여
-            message: `📢 [설명] ${player.name}: "${description}"`
-        });
-    }
-
-    room.currentTurnIndex++;
-    if (room.currentTurnIndex < room.turnOrder.length) {
-      io.to(roomId).emit('update-turn', room.turnOrder[room.currentTurnIndex]);
-    } else {
-      room.status = 'VOTING';
-      io.to(roomId).emit('update-game-status', 'VOTING');
-      io.to(roomId).emit('chat-message', { id: 'sys-vote', author: 'SYSTEM', message: '설명이 끝났습니다. 라이어를 투표해주세요!' });
-    }
+    handleNextTurnInternal(roomId, socket, description);
   });
 
   socket.on('submit-vote', (targetId) => {
@@ -209,6 +292,8 @@ io.on('connection', (socket) => {
     const roomId = socket.roomId;
     const room = rooms[roomId];
     if (!room || room.status !== 'LIAR_GUESS') return;
+
+    stopTimer(roomId); // 라이어 정답 제출 시 타이머 중지
 
     const liar = room.players.find(p => p.id === socket.id);
     if (!liar || liar.role !== 'LIAR') return;
@@ -251,12 +336,13 @@ io.on('connection', (socket) => {
     if (roomId && rooms[roomId]) {
       const room = rooms[roomId];
       const playerIndex = room.players.findIndex(p => p.id === socket.id);
-      
+
       if (playerIndex !== -1) {
         const leftPlayer = room.players[playerIndex];
         room.players.splice(playerIndex, 1);
 
         if (room.players.length === 0) {
+          stopTimer(roomId);
           delete rooms[roomId];
         } else {
           if (leftPlayer.isHost) {
@@ -265,6 +351,7 @@ io.on('connection', (socket) => {
           }
 
           if (room.status !== 'LOBBY' && room.status !== 'RESULT') {
+            stopTimer(roomId); // 나갔을 때 타이머 중지
             if (leftPlayer.role === 'LIAR') {
               io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: '라이어가 나갔습니다! 시민의 승리입니다.' });
               room.status = 'LOBBY';

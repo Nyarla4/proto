@@ -30,10 +30,24 @@ function App() {
   const [gameResult, setGameResult] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [guessWord, setGuessWord] = useState("");
-  const [descInput, setDescInput] = useState(""); // 추가: 내 턴 설명 입력용
+  const [descInput, setDescInput] = useState(""); 
   const [isInfoVisible, setIsInfoVisible] = useState(true);
+  
+  // 타이머 상태
+  const [timeLeft, setTimeLeft] = useState(0);
 
   const chatEndRef = useRef(null);
+  // ref를 사용하여 handleNextTurn 내부의 최신 상태값에 접근 (타이머 0초 시 자동 전송용)
+  const descInputRef = useRef("");
+  const currentTurnIdRef = useRef("");
+
+  useEffect(() => {
+    descInputRef.current = descInput;
+  }, [descInput]);
+
+  useEffect(() => {
+    currentTurnIdRef.current = currentTurnId;
+  }, [currentTurnId]);
 
   useEffect(() => {
     const scriptId = "tailwind-cdn";
@@ -46,7 +60,6 @@ function App() {
 
     socket.on("connect", () => setIsConnected(true));
     socket.on("disconnect", () => setIsConnected(false));
-
     socket.on("update-players", (data) => setPlayers(data));
     socket.on("chat-message", (data) => setChatLog((prev) => [...prev, data]));
 
@@ -62,12 +75,25 @@ function App() {
       setHasVoted(false);
       setVotedCount(0);
       setGuessWord("");
-      setDescInput(""); // 초기화
+      setDescInput("");
     });
 
     socket.on("update-game-status", (status) => setGameStatus(status));
     socket.on("update-turn", (id) => setCurrentTurnId(id));
     socket.on("update-voted-count", (count) => setVotedCount(count));
+
+    // 타이머 이벤트 수신 로직 보완
+    socket.on("timer-tick", (time) => {
+      setTimeLeft(time);
+      
+      // 누락된 부분: 시간이 0이 되었을 때 내 턴이라면 자동 전송 혹은 초기화 로직
+      if (time === 0) {
+        if (currentTurnIdRef.current === socket.id && gameStatus === "PLAYING") {
+          // 서버에서 자동으로 넘기겠지만, 클라이언트에서도 입력값을 비워주는 처리가 필요함
+          setDescInput(""); 
+        }
+      }
+    });
 
     socket.on("game-result", (result) => {
       setGameResult(result);
@@ -87,10 +113,11 @@ function App() {
       socket.off("update-game-status");
       socket.off("update-turn");
       socket.off("update-voted-count");
+      socket.off("timer-tick");
       socket.off("game-result");
       socket.off("error-message");
     };
-  }, []);
+  }, [gameStatus]); // gameStatus가 바뀔 때 리스너 내부 분기 처리를 위해 의존성 추가
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -117,16 +144,22 @@ function App() {
   const handleToggleReady = () => socket.emit("toggle-ready");
   const handleStartGame = () => socket.emit("start-game", roomId);
 
-  // 변경된 턴 완료 핸들러: 입력된 설명을 함께 전송
+  const handleDescInputChange = (e) => {
+    const val = e.target.value;
+    setDescInput(val);
+    if (currentTurnId === socket.id) {
+      socket.emit("update-input", val);
+    }
+  };
+
   const handleNextTurn = (e) => {
     if (e) e.preventDefault();
     if (!descInput.trim()) {
       setShowError("단어에 대한 설명을 입력해주세요.");
-      setTimeout(() => setShowError(""), 2000);
       return;
     }
     socket.emit("next-turn", descInput);
-    setDescInput(""); // 전송 후 비우기
+    setDescInput(""); 
   };
 
   const handleVote = (targetId) => {
@@ -230,6 +263,11 @@ function App() {
                 SCORE: <span className="text-blue-600">{myInfo?.score || 0}</span> | {myInfo?.isHost ? "HOST 👑" : "MEMBER"}
               </span>
             </div>
+            {gameStatus !== "LOBBY" && gameStatus !== "RESULT" && (
+              <div className={`ml-auto px-3 py-1 rounded-xl border-2 font-black text-sm md:text-lg ${timeLeft <= 5 ? 'bg-rose-50 border-rose-400 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                {timeLeft}s
+              </div>
+            )}
           </div>
 
           <div className="bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
@@ -237,8 +275,8 @@ function App() {
               <span>
                 {gameStatus === "LOBBY" ? "🏠 Lobby" :
                   gameStatus === "VOTING" ? "🗳 Voting" :
-                    gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
-                      gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
+                  gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
+                  gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
               </span>
             </h2>
 
@@ -257,25 +295,18 @@ function App() {
                       } ${socket.id === p.id ? "ring-1 ring-blue-400" : ""}`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      {/* 이름 섹션 */}
                       <div className="flex items-center gap-1.5 truncate">
                         {p.isHost && <span className="text-xs" title="방장">👑</span>}
                         <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
                           {p.name}
                         </span>
                       </div>
-
-                      {/* 점수 표시 (기존 스타일 유지) */}
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
                         {p.score || 0}pt
                       </span>
-
-                      {/* 게임 중 턴 표시 */}
                       {currentTurnId === p.id && gameStatus === "PLAYING" && (
                         <span className="text-[8px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse uppercase shrink-0">Turn</span>
                       )}
-
-                      {/* 로비 또는 결과창에서 준비 상태 표시 */}
                       {(gameStatus === "LOBBY" || gameStatus === "RESULT") && !p.isHost && (
                         <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border ${p.isReady
                             ? "bg-emerald-50 border-emerald-200 text-emerald-600"
@@ -285,8 +316,6 @@ function App() {
                         </span>
                       )}
                     </div>
-
-                    {/* 우측 액션: 투표 버튼 */}
                     {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
                       <button
                         onClick={() => handleVote(p.id)}
@@ -338,19 +367,18 @@ function App() {
                 </button>
               )
             ) : isMyTurn ? (
-              // 수정됨: 설명 입력 UI 추가
               <form onSubmit={handleNextTurn} className="space-y-2">
                 <input
                   type="text"
                   value={descInput}
-                  onChange={(e) => setDescInput(e.target.value)}
+                  onChange={handleDescInputChange}
                   placeholder="단어에 대해 설명해주세요!"
                   className="w-full p-3 bg-amber-50 border-2 border-amber-200 rounded-xl outline-none font-bold text-center focus:border-amber-500 transition-all text-sm"
                 />
                 <button type="submit" className="w-full bg-amber-400 text-amber-900 py-3 rounded-xl font-black hover:bg-amber-500 shadow-lg uppercase italic border-b-4 border-amber-600 active:translate-y-1 active:border-b-0 transition-all">설명 완료</button>
               </form>
             ) : (
-              <div className="text-center py-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 font-black text-xs italic animate-pulse">DESCRIBING...</div>
+              <div className="text-center py-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 font-black text-xs italic animate-pulse">DESCRIBING... ({timeLeft}s)</div>
             )}
           </div>
         </div>
@@ -365,13 +393,11 @@ function App() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/10">
             {chatLog.map((chat) => (
               <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : chat.author === 'SYSTEM_DESC' ? "items-center" : "items-start"}`}>
-                {/* 설명 메시지(SYSTEM_DESC)는 이름을 표시하지 않음 */}
                 {chat.author !== 'SYSTEM_DESC' && (
                   <span className={`text-[9px] font-black mb-1 px-2 uppercase tracking-tighter ${chat.author === 'SYSTEM' ? 'text-blue-500' : 'text-slate-400'}`}>
                     {chat.author === name ? "Me" : chat.author}
                   </span>
                 )}
-
                 <div className={`px-4 py-2 rounded-[1.2rem] max-w-[85%] break-all shadow-sm font-medium text-sm ${chat.author === 'SYSTEM' ? "bg-slate-800 text-white mx-auto text-center rounded-2xl text-[11px] py-1.5" :
                     chat.author === 'SYSTEM_DESC' ? "bg-blue-100 text-blue-900 border-2 border-blue-400 rounded-2xl w-full text-center py-3 font-black italic text-base" :
                       chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
