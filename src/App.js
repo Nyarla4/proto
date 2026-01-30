@@ -348,7 +348,7 @@ function App() {
                           {p.isReady ? "Ready" : "Wait"}
                         </span>
                       ) : p.userType === "SPECTATOR" && (
-                        <span className={"text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border bg-indigo-50 border-indigo-200 text-indigo-600"}>"Spectator"</span>
+                        <span className={"text-[9px] font-black px-2 py-0.5 rounded-md uppercase border bg-indigo-50 border-indigo-200 text-indigo-600"}>Spectator</span>
                       )}
                     </div>
                     {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
@@ -365,7 +365,7 @@ function App() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-[1.5rem] shadow-sm border border-slate-200 shrink-0">
+          <div className={`bg-white p-4 rounded-2xl shadow-sm border-2 transition-all duration-500 ${isMyTurn ? "border-amber-400 ring-8 ring-amber-100/50 scale-105 z-20 shadow-2xl" : "border-slate-200"}`}>
             {gameStatus === "LOBBY" ? (
               myInfo?.isHost ? (
                 <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 uppercase italic">게임 시작</button>
@@ -425,7 +425,7 @@ function App() {
             </h3>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/10">
+          <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all duration-500 ${isMyTurn ? "opacity-10 grayscale blur-[3px] scale-[0.98] pointer-events-none" : "opacity-100"}`}>
             {chatLog.map((chat) => (
               <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : chat.author === 'SYSTEM_DESC' ? "items-center" : "items-start"}`}>
                 {chat.author !== 'SYSTEM_DESC' && (
