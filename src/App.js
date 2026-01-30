@@ -403,6 +403,7 @@ function App() {
               )
             ) : isMyTurn && !isSpectator ? (
               <form onSubmit={handleNextTurn} className="space-y-2">
+                {/* <div className="text-xs font-black text-amber-500 text-center animate-bounce uppercase">Your Turn!</div> */}
                 <input
                   type="text"
                   value={descInput}
@@ -425,7 +426,7 @@ function App() {
             </h3>
           </div>
 
-          <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all duration-500 ${isMyTurn && gameStatus ? "opacity-10 grayscale blur-[3px] scale-[0.98] pointer-events-none" : "opacity-100"}`}>
+          <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all duration-500 ${isMyTurn && gameStatus ? "opacity-50" : "opacity-100"}`}>
             {chatLog.map((chat) => (
               <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : chat.author === 'SYSTEM_DESC' ? "items-center" : "items-start"}`}>
                 {chat.author !== 'SYSTEM_DESC' && (
@@ -446,7 +447,7 @@ function App() {
 
           <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-50 flex gap-2 shrink-0">
             <input
-              className="flex-1 p-3 bg-slate-50 rounded-xl outline-none font-bold text-slate-700 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm"
+              className='flex-1 p-3 bg-slate-50 rounded-xl outline-none font-bold text-slate-700 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm ${isMyTurn && gameStatus === "PLAYING" ? "opacity-20 pointer-events-none" : "opacity-100"}'
               placeholder="메시지 전송..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
