@@ -152,6 +152,8 @@ const handleGuessResult = (roomId, guess) => {
     liar: { name: liar.name, word: room.citizenWord },
     votes: room.votes
   });
+
+  room.players.forEach(p=>p.userType = 'PLAYER');
   io.to(roomId).emit('update-game-status', 'RESULT');
   io.to(roomId).emit('update-players', room.players);
 };
@@ -205,6 +207,8 @@ io.on('connection', (socket) => {
       author: 'SYSTEM',
       message: `${name}님이 입장하셨습니다.`
     });
+
+    io.to(roomId).emit('update-game-status', room.status);
   });
 
   // [추가] 클라이언트에서 입력 중인 텍스트 수신
