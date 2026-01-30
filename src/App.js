@@ -241,11 +241,16 @@ function App() {
     );
   }
 
+  // 1. 관전자 및 플레이어 관련 상태 계산 (render 함수 상단에 위치)
   const myInfo = players.find(p => p.id === socket.id);
   const isMyTurn = currentTurnId === socket.id;
   const isLiar = myGameData?.role === "LIAR";
 
-  // 타이머가 표시되어야 하는 상태인지 확인
+  // 현재 접속자가 관전자인지 확인
+  const isSpectator = myInfo?.userType === 'SPECTATOR';
+
+  // 투표 인원 계산 시 실제 플레이어(PLAYER)만 필터링 (관전자 제외)
+  const activePlayersCount = players.filter(p => p.userType === 'PLAYER').length;
   const isTimerActive = ["PLAYING", "VOTING", "LIAR_GUESS"].includes(gameStatus);
 
   return (
@@ -339,7 +344,7 @@ function App() {
                         </span>
                       )}
                     </div>
-                    {gameStatus === "VOTING" && !hasVoted && p.id !== socket.id && (
+                    {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
                       <button
                         onClick={() => handleVote(p.id)}
                         className="bg-rose-500 text-white text-[10px] px-3 py-1 rounded-lg font-black hover:bg-rose-600 transition-colors uppercase shadow-sm shrink-0"
@@ -364,10 +369,10 @@ function App() {
               )
             ) : gameStatus === "VOTING" ? (
               <div className="text-center py-4 bg-rose-50 rounded-2xl border-2 border-dashed border-rose-200 font-black uppercase text-xs text-rose-600 animate-pulse">
-                {hasVoted ? `VOTED (${votedCount}/${players.length})` : "SELECT THE LIAR!"}
+                {isSpectator ? "Voting in Progress..." : (hasVoted ? `Voted (${votedCount}/${activePlayersCount})` : "Who is the Liar?")}
               </div>
             ) : gameStatus === "LIAR_GUESS" ? (
-              isLiar ? (
+              isLiar && !isSpectator ? (
                 <form onSubmit={handleSubmitGuess} className="space-y-2">
                   <input
                     type="text"
@@ -389,7 +394,7 @@ function App() {
                   {myInfo?.isReady ? "준비완료" : "준비"}
                 </button>
               )
-            ) : isMyTurn ? (
+            ) : isMyTurn && !isSpectator ? (
               <form onSubmit={handleNextTurn} className="space-y-2">
                 <input
                   type="text"

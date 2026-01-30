@@ -99,25 +99,25 @@ const processVoteResults = (roomId) => {
   room.status = 'LIAR_GUESS';
   io.to(roomId).emit('update-game-status', 'LIAR_GUESS');
   io.to(roomId).emit('update-players', room.players);
-  
+
   // --- [수정] 라이어 정답 추리 타이머 시작 (예: 15초) ---
   startTimer(roomId, 15, () => {
     if (room.status === 'LIAR_GUESS') {
-    // 1. 현재 방에서 라이어 역할을 가진 플레이어를 찾습니다.
-    const currentLiar = room.players.find(p => p.role === 'LIAR');
-    
-    // 2. 해당 플레이어가 실시간으로 보내온 currentInput 값을 가져옵니다. (없으면 빈 문자열)
-    const lastInput = currentLiar ? currentLiar.currentInput : "";
-    
-    // 3. 사용자들에게 알림을 보냅니다.
-    io.to(roomId).emit('chat-message', { 
-      author: 'SYSTEM', 
-      message: `⏰ 시간이 초과되었습니다! 최종 입력값 [${lastInput || "없음"}]으로 정답을 판정합니다.` 
-    });
-    
-    // 4. 기존에 만들어둔 판정 함수에 해당 입력값을 넣어 결과 처리
-    handleGuessResult(roomId, lastInput);
-  }
+      // 1. 현재 방에서 라이어 역할을 가진 플레이어를 찾습니다.
+      const currentLiar = room.players.find(p => p.role === 'LIAR');
+
+      // 2. 해당 플레이어가 실시간으로 보내온 currentInput 값을 가져옵니다. (없으면 빈 문자열)
+      const lastInput = currentLiar ? currentLiar.currentInput : "";
+
+      // 3. 사용자들에게 알림을 보냅니다.
+      io.to(roomId).emit('chat-message', {
+        author: 'SYSTEM',
+        message: `⏰ 시간이 초과되었습니다! 최종 입력값 [${lastInput || "없음"}]으로 정답을 판정합니다.`
+      });
+
+      // 4. 기존에 만들어둔 판정 함수에 해당 입력값을 넣어 결과 처리
+      handleGuessResult(roomId, lastInput);
+    }
   });
 
 };
@@ -183,9 +183,11 @@ io.on('connection', (socket) => {
     socket.roomId = roomId;
 
     const isHost = room.players.length === 0;
+    const isPlaying = room.status !== 'RESULT' && room.status !== 'LOBBY';
     const newPlayer = {
       id: socket.id,
       name,
+      userType: isPlaying ? 'SPECTATOR' : 'PLAYER', // 추가: 'PLAYER' 또는 'SPECTATOR'
       isReady: isHost,
       isHost: isHost,
       role: '',
@@ -267,18 +269,25 @@ io.on('connection', (socket) => {
     }
   };
 
+  // [중요] 게임 시작 시점의 로직 수정
   socket.on('start-game', (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
-    if (room.players.length < 3) return socket.emit('error-message', '최소 3명이 필요합니다.');
-    if (!room.players.every(p => p.isReady)) return socket.emit('error-message', '모든 플레이어가 준비 완료 상태여야 합니다.');
+
+    // 1. 실제 게임에 참여하는 인원만 추출
+    const activePlayers = room.players.filter(p => p.userType === 'PLAYER');
+
+    // 최소 인원 체크 등은 activePlayers 기준
+    if (activePlayers.length < 3) return socket.emit('error-message', '최소 3명이 필요합니다.');
+    if (!activePlayers.every(p => p.isReady)) return socket.emit('error-message', '모든 플레이어가 준비 완료 상태여야 합니다.');
 
     const categories = Object.keys(wordDb);
     const categoryName = categories[Math.floor(Math.random() * categories.length)];
     const shuffledWords = [...wordDb[categoryName]].sort(() => Math.random() - 0.5);
     const liarWord = shuffledWords[0];
     const citizenWord = shuffledWords[1];
-    const liarIndex = Math.floor(Math.random() * room.players.length);
+    // 3. 역할 부여 (activePlayers 내에서만 라이어 선정)
+    const liarIndex = Math.floor(Math.random() * activePlayers.length);
 
     room.status = 'PLAYING';
     room.category = categoryName;
@@ -287,16 +296,24 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.votedCount = 0;
     room.roundResults = { voteSuccess: false, guessSuccess: false };
-    room.turnOrder = room.players.map(p => p.id).sort(() => Math.random() - 0.5);
+    // 2. 턴 순서(turnOrder)는 반드시 activePlayers의 ID로만 구성
+    room.turnOrder = activePlayers.map(p => p.id).sort(() => Math.random() - 0.5);
     room.currentTurnIndex = 0;
-
-    room.players.forEach((p, i) => {
+    
+    activePlayers.forEach((p, i) => {
       const isLiar = i === liarIndex;
       p.role = isLiar ? 'LIAR' : 'CITIZEN';
       p.word = isLiar ? liarWord : citizenWord;
       p.votedFor = '';
       p.currentInput = '';
       io.to(p.id).emit('game-start', { role: p.role, word: p.word, category: categoryName });
+    });
+
+    // SPECTATOR 처리
+    room.players.filter(p => p.userType === 'SPECTATOR').forEach(p => {
+      p.role = 'SPECTATOR';
+      p.word = '(관전 중)';
+      io.to(p.id).emit('game-start', { role: 'SPECTATOR', word: '관전 중', category: room.category });
     });
 
     io.to(roomId).emit('update-game-status', 'PLAYING');
@@ -307,7 +324,7 @@ io.on('connection', (socket) => {
     // [수정된 부분] 첫 번째 플레이어 턴 전송 및 타이머 시작
     const firstPlayerId = room.turnOrder[0];
     io.to(roomId).emit('update-turn', firstPlayerId);
-    
+
     startTimer(roomId, 30, () => {
       const p = room.players.find(player => player.id === firstPlayerId);
       // 현재 입력 중인 내용이 있다면 그것을 사용, 없다면 "(시간 초과)" 메시지
@@ -331,13 +348,19 @@ io.on('connection', (socket) => {
     if (!room || room.status !== 'VOTING') return;
 
     const player = room.players.find(p => p.id === socket.id);
+    
+    // 관전자는 투표권이 없으므로 무시
+    if (!player || player.userType !== 'PLAYER') return;
+
     if (player && !player.votedFor) {
       player.votedFor = targetId;
       room.votes[targetId] = (room.votes[targetId] || 0) + 1;
       room.votedCount++;
       io.to(roomId).emit('update-voted-count', room.votedCount);
 
-      if (room.votedCount === room.players.length) {
+      // [수정] 전체 인원이 아니라 실제 플레이어(activePlayers) 수와 비교해야 함
+      const activePlayers = room.players.filter(p => p.userType === 'PLAYER');
+      if (room.votedCount === activePlayers.length) {
         processVoteResults(roomId);
       }
     }
