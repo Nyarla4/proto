@@ -243,7 +243,7 @@ function App() {
 
   // 1. 관전자 및 플레이어 관련 상태 계산 (render 함수 상단에 위치)
   const myInfo = players.find(p => p.id === socket.id);
-  const isMyTurn = currentTurnId === socket.id;
+  const isMyTurn = currentTurnId === socket.id && gameStatus === "PLAYING";
   const isLiar = myGameData?.role === "LIAR";
 
   // 현재 접속자가 관전자인지 확인
@@ -425,7 +425,7 @@ function App() {
             </h3>
           </div>
 
-          <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all duration-500 ${isMyTurn ? "opacity-10 grayscale blur-[3px] scale-[0.98] pointer-events-none" : "opacity-100"}`}>
+          <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all duration-500 ${isMyTurn && gameStatus ? "opacity-10 grayscale blur-[3px] scale-[0.98] pointer-events-none" : "opacity-100"}`}>
             {chatLog.map((chat) => (
               <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : chat.author === 'SYSTEM_DESC' ? "items-center" : "items-start"}`}>
                 {chat.author !== 'SYSTEM_DESC' && (

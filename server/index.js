@@ -256,7 +256,7 @@ io.on('connection', (socket) => {
       // 다음 사람 타이머 시작
       startTimer(roomId, 30, () => {
         const p = room.players.find(player => player.id === nextPlayerId);
-        const forcedDesc = p ? (p.currentInput || "(시간 초加)") : "";
+        const forcedDesc = p ? (p.currentInput || "(시간 초과)") : "";
         io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ [${p?.name}]님 시간 초과!` });
         handleNextTurnInternal(roomId, targetSocket, forcedDesc);
       });
