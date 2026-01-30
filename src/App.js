@@ -285,6 +285,11 @@ function App() {
               <div className="flex items-center gap-2">
                 <span className="font-black text-base md:text-xl text-slate-900 leading-none truncate max-w-[100px] md:max-w-none">{name}</span>
                 <span className="bg-blue-600 text-white text-[8px] md:text-[10px] px-1.5 py-0.5 rounded-full font-black uppercase">Me</span>
+                {isSpectator && (
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border bg-indigo-50 border-indigo-200 text-indigo-600 ml-1">
+                    Spectator
+                  </span>
+                )}
               </div>
               <span className="text-slate-400 text-[9px] md:text-xs font-bold mt-1 uppercase">
                 SCORE: <span className="text-blue-600">{myInfo?.score || 0}</span> | {myInfo?.isHost ? "HOST 👑" : "MEMBER"}
@@ -328,11 +333,6 @@ function App() {
                         <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
                           {p.name}
                         </span>
-                        {isSpectator && (
-                          <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border bg-indigo-50 border-indigo-200 text-indigo-600 ml-1">
-                            Spectator
-                          </span>
-                        )}
                       </div>
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
                         {p.score || 0}pt
@@ -347,7 +347,7 @@ function App() {
                           }`}>
                           {p.isReady ? "Ready" : "Wait"}
                         </span>
-                      ) : isSpectator && (
+                      ) : p.userType === "SPECTATOR" && (
                         <span className={"text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border bg-indigo-50 border-indigo-200 text-indigo-600"}>"Spectator"</span>
                       )}
                     </div>
