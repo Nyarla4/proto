@@ -328,6 +328,11 @@ function App() {
                         <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
                           {p.name}
                         </span>
+                        {isSpectator && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border bg-indigo-50 border-indigo-200 text-indigo-600 ml-1">
+                            Spectator
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
                         {p.score || 0}pt
@@ -335,13 +340,15 @@ function App() {
                       {currentTurnId === p.id && gameStatus === "PLAYING" && (
                         <span className="text-[8px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse uppercase shrink-0">Turn</span>
                       )}
-                      {(gameStatus === "LOBBY" || gameStatus === "RESULT") && !p.isHost && (
+                      {((gameStatus === "LOBBY" || gameStatus === "RESULT") && !p.isHost) ? (
                         <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border ${p.isReady
                             ? "bg-emerald-50 border-emerald-200 text-emerald-600"
                             : "bg-slate-50 border-slate-200 text-slate-400"
                           }`}>
                           {p.isReady ? "Ready" : "Wait"}
                         </span>
+                      ) : isSpectator && (
+                        <span className={"text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border bg-indigo-50 border-indigo-200 text-indigo-600"}>"Spectator"</span>
                       )}
                     </div>
                     {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
