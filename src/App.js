@@ -293,7 +293,7 @@ function App() {
             onClick={handleExit}
             className="bg-rose-50 text-rose-600 border-2 border-rose-200 px-3 py-1.5 rounded-full text-[10px] font-black uppercase shadow-sm active:scale-95 transition-all duration-300 hover:bg-rose-600 hover:text-white hover:border-rose-600"
           >
-            EXIT
+            EXIT ROOM
           </button>
         </div>
       </div>
