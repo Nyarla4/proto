@@ -443,7 +443,7 @@ function App() {
             </h3>
             <button
               onClick={handleExit}
-              className="text-[10px] font-black px-2 py-1 rounded-md uppercase border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 transition-all flex items-center gap-1"
+              className="text-[10px] font-bold px-3 py-1.5 rounded-xl uppercase border-2 border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all duration-300 flex items-center gap-1.5 shadow-sm active:scale-95"
             >
               Exit Room
             </button>
