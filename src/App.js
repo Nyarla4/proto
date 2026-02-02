@@ -280,20 +280,22 @@ function App() {
 
       <div className="md:hidden bg-white/80 backdrop-blur-sm p-3 flex justify-between items-center border-b shrink-0 z-40">
         <span className="font-black italic text-slate-800 tracking-tighter">🕵️ {roomId.toUpperCase()}</span>
-        <button
-          onClick={() => setIsInfoVisible(!isInfoVisible)}
-          className="bg-slate-800 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform"
-        >
-          {isInfoVisible ? "HIDE INFO" : "SHOW INFO"}
-        </button>
+        {/* [수정] gap을 조절하여 두 버튼 사이의 간격을 좁게 밀착시킴 */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setIsInfoVisible(!isInfoVisible)}
+            className="bg-slate-800 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform"
+          >
+            {isInfoVisible ? "HIDE INFO" : "SHOW INFO"}
+          </button>
 
-        {/* 모바일 전용 빨간색 나가기 버튼 추가 */}
-        <button
-          onClick={handleExit}
-          className="bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-full text-[10px] font-black uppercase shadow-sm active:scale-95 transition-all"
-        >
-          EXIT
-        </button>
+          <button
+            onClick={handleExit}
+            className="bg-rose-50 text-rose-600 border-2 border-rose-200 px-3 py-1.5 rounded-full text-[10px] font-black uppercase shadow-sm active:scale-95 transition-all duration-300 hover:bg-rose-600 hover:text-white hover:border-rose-600"
+          >
+            EXIT
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row flex-1 p-2 md:p-4 gap-2 md:gap-4 overflow-hidden">
