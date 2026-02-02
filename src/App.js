@@ -30,9 +30,9 @@ function App() {
   const [gameResult, setGameResult] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [guessWord, setGuessWord] = useState("");
-  const [descInput, setDescInput] = useState(""); 
+  const [descInput, setDescInput] = useState("");
   const [isInfoVisible, setIsInfoVisible] = useState(true);
-  
+
   // 타이머 상태
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -84,14 +84,14 @@ function App() {
     // 타이머 이벤트 수신 로직 보완
     socket.on("timer-tick", (time) => {
       setTimeLeft(time);
-      
+
       // 누락된 부분: 시간이 0이 되었을 때 내 턴이라면 자동 전송 혹은 초기화 로직
       if (time === 0) {
         // 1. 일반 설명 단계 시간 초과
         if (gameStatusRef.current === "PLAYING" && currentTurnIdRef.current === socket.id) {
           // 시간이 다 되면 현재까지 입력한 내용이라도 강제 제출 (서버에서 다음 턴으로 넘김)
           socket.emit("next-turn", descInputRef.current || "시간 초과로 설명을 건너뜁니다.");
-          setDescInput(""); 
+          setDescInput("");
         }
         // 2. 라이어 정답 제출 단계 시간 초과
         if (gameStatusRef.current === "LIAR_GUESS" && myGameData?.role === "LIAR") {
@@ -178,7 +178,7 @@ function App() {
       return;
     }
     socket.emit("next-turn", descInput);
-    setDescInput(""); 
+    setDescInput("");
   };
 
   const handleVote = (targetId) => {
@@ -193,6 +193,23 @@ function App() {
       socket.emit("submit-guess", guessWord);
     }
   };
+
+  const handleExit = () => {
+    if (!window.confirm("정말 방에서 나가시겠습니까?")) return;
+
+    // 1. 소켓 연결을 물리적으로 끊음 -> 서버의 'disconnect' 로직이 즉시 실행됨
+    socket.disconnect();
+
+    // 2. UI 상태 초기화 (입장 전 화면으로 이동)
+    setIsJoined(false);
+    setGameStatus("LOBBY");
+    setChatLog([]);
+
+    // 3. 나중에 다시 입장하고 싶을 수도 있으므로 소켓 재연결 준비
+    // (이 로직이 없으면 다음에 입장할 때 연결이 안 될 수 있음)
+    socket.connect();
+  };
+
 
   if (!isJoined) {
     return (
@@ -308,8 +325,8 @@ function App() {
               <span>
                 {gameStatus === "LOBBY" ? "🏠 Lobby" :
                   gameStatus === "VOTING" ? "🗳 Voting" :
-                  gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
-                  gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
+                    gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
+                      gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
               </span>
             </h2>
 
@@ -342,8 +359,8 @@ function App() {
                       )}
                       {((gameStatus === "LOBBY" || gameStatus === "RESULT") && !p.isHost) ? (
                         <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border ${p.isReady
-                            ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                            : "bg-slate-50 border-slate-200 text-slate-400"
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                          : "bg-slate-50 border-slate-200 text-slate-400"
                           }`}>
                           {p.isReady ? "Ready" : "Wait"}
                         </span>
@@ -424,6 +441,12 @@ function App() {
             <h3 className="font-black text-slate-800 italic uppercase text-xs flex items-center gap-2">
               <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span> {roomId.toUpperCase()} CHAT
             </h3>
+            <button
+              onClick={handleExit}
+              className="text-[10px] font-black px-2 py-1 rounded-md uppercase border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200 transition-all flex items-center gap-1"
+            >
+              Exit Room
+            </button>
           </div>
 
           <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all duration-500 ${isMyTurn && gameStatus ? "opacity-50" : "opacity-100"}`}>
@@ -435,8 +458,8 @@ function App() {
                   </span>
                 )}
                 <div className={`px-4 py-2 rounded-[1.2rem] max-w-[85%] break-all shadow-sm font-medium text-sm ${chat.author === 'SYSTEM' ? "bg-slate-800 text-white mx-auto text-center rounded-2xl text-[11px] py-1.5" :
-                    chat.author === 'SYSTEM_DESC' ? "bg-blue-100 text-blue-900 border-2 border-blue-400 rounded-2xl w-full text-center py-3 font-black italic text-base" :
-                      chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
+                  chat.author === 'SYSTEM_DESC' ? "bg-blue-100 text-blue-900 border-2 border-blue-400 rounded-2xl w-full text-center py-3 font-black italic text-base" :
+                    chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
                   }`}>
                   {chat.message}
                 </div>
