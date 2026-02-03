@@ -34,11 +34,11 @@ const startTimer = (roomId, duration, onTimeUp) => {
   if (room.timer) clearInterval(room.timer);
 
   room.timeLeft = duration;
-  io.to(roomId).emit('timer-tick', room.timeLeft);
+  io.to(roomId).emit('timer-tick', room.timeLeft, duration);
 
   room.timer = setInterval(() => {
     room.timeLeft--;
-    io.to(roomId).emit('timer-tick', room.timeLeft);
+    io.to(roomId).emit('timer-tick', room.timeLeft, duration);
 
     if (room.timeLeft <= 0) {
       clearInterval(room.timer);

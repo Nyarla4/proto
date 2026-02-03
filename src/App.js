@@ -35,6 +35,7 @@ function App() {
 
   // 타이머 상태
   const [timeLeft, setTimeLeft] = useState(0);
+  const [timeMax, setTimeMax] = useState(0);
 
   const chatEndRef = useRef(null);
   const descInputRef = useRef("");
@@ -80,8 +81,9 @@ function App() {
     socket.on("update-turn", (id) => setCurrentTurnId(id));
     socket.on("update-voted-count", (count) => setVotedCount(count));
 
-    socket.on("timer-tick", (time) => {
+    socket.on("timer-tick", (time, maxTime) => {
       setTimeLeft(time);
+      setTimeMax(maxTime);
       if (time === 0) {
         if (gameStatusRef.current === "PLAYING" && currentTurnIdRef.current === socket.id) {
           socket.emit("next-turn", descInputRef.current || "시간 초과로 설명을 건너뜁니다.");
@@ -164,6 +166,7 @@ function App() {
     if (e) e.preventDefault();
     if (!descInput.trim()) {
       setShowError("단어에 대한 설명을 입력해주세요.");
+      setTimeout(() => setShowError(""), 2000);
       return;
     }
     socket.emit("next-turn", descInput);
@@ -245,6 +248,8 @@ function App() {
     );
   }
 
+  const gaugeWidth = Math.min(100, (timeLeft / timeMax) * 100);
+
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans relative">
       {showError && (
@@ -257,6 +262,13 @@ function App() {
       {isMyTurn && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* 상단 타이머 게이지 */}
+            <div className="h-2 bg-slate-100 w-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 5 ? 'bg-rose-500' : 'bg-blue-600'}`}
+                style={{ width: `${gaugeWidth}%` }}
+              />
+            </div>
             <div className="bg-blue-600 p-5 text-center">
               <span className="text-white font-black text-xl italic uppercase tracking-tighter">Your Turn</span>
             </div>
