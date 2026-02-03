@@ -32,6 +32,9 @@ function App() {
   const [guessWord, setGuessWord] = useState("");
   const [descInput, setDescInput] = useState("");
   const [isInfoVisible, setIsInfoVisible] = useState(true);
+  
+  // 모달 최소화 상태
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // 타이머 상태
   const [timeLeft, setTimeLeft] = useState(0);
@@ -75,10 +78,14 @@ function App() {
       setVotedCount(0);
       setGuessWord("");
       setDescInput("");
+      setIsMinimized(false); // 게임 시작 시 초기화
     });
 
     socket.on("update-game-status", (status) => setGameStatus(status));
-    socket.on("update-turn", (id) => setCurrentTurnId(id));
+    socket.on("update-turn", (id) => {
+      setCurrentTurnId(id);
+      if (id === socket.id) setIsMinimized(false); // 내 차례가 되면 다시 크게 보여줌
+    });
     socket.on("update-voted-count", (count) => setVotedCount(count));
 
     socket.on("timer-tick", (time, maxTime) => {
@@ -217,25 +224,25 @@ function App() {
           <form onSubmit={handleJoin} className="space-y-4">
             <div className="space-y-1 text-left">
               <label className="text-[10px] font-black text-slate-400 ml-2 uppercase">Room ID</label>
-              <input
-                type="text"
-                className="w-full p-4 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-                required
-              />
+            <input
+              type="text"
+              className="w-full p-4 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              required
+            />
             </div>
             <div className="space-y-1 text-left">
               <label className="text-[10px] font-black text-slate-400 ml-2 uppercase">Nickname</label>
-              <input
-                type="text"
+            <input
+              type="text"
                 placeholder="닉네임 입력"
-                className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                maxLength={10}
-              />
+              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              maxLength={10}
+            />
             </div>
             <button type="submit" className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 uppercase active:scale-95">입장하기</button>
           </form>
@@ -248,7 +255,7 @@ function App() {
     );
   }
 
-  const gaugeWidth = Math.min(100, (timeLeft / timeMax) * 100);
+  const gaugeWidth = timeMax > 0 ? Math.min(100, (timeLeft / timeMax) * 100) : 0;
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans relative">
@@ -258,10 +265,16 @@ function App() {
         </div>
       )}
 
-      {/* 일반 플레이 모달 (White & Blue 테마) */}
+      {/* 내 차례 설명 모달 (최소화 기능 추가) */}
       {isMyTurn && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className={`fixed z-[60] transition-all duration-500 ease-in-out ${
+          isMinimized 
+          ? "bottom-4 right-4 w-72 md:w-80" 
+          : "inset-0 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+        }`}>
+          <div className={`bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transition-all duration-500 ${
+            isMinimized ? "scale-100 shadow-blue-200/50 border-blue-200 border-2" : "w-full max-w-lg animate-in zoom-in-95"
+          }`}>
             {/* 상단 타이머 게이지 */}
             <div className="h-2 bg-slate-100 w-full overflow-hidden">
               <div 
@@ -269,59 +282,121 @@ function App() {
                 style={{ width: `${gaugeWidth}%` }}
               />
             </div>
-            <div className="bg-blue-600 p-5 text-center">
-              <span className="text-white font-black text-xl italic uppercase tracking-tighter">Your Turn</span>
+            
+            {/* 헤더 섹션 (최소화 버튼 포함) */}
+            <div className="bg-blue-600 p-4 flex justify-between items-center relative">
+              <span className={`text-white font-black italic uppercase tracking-tighter ${isMinimized ? 'text-sm' : 'text-xl mx-auto'}`}>
+                Your Turn
+              </span>
+              <button 
+                onClick={() => setIsMinimized(!isMinimized)}
+                className="text-white/80 hover:text-white transition-colors p-1"
+                title={isMinimized ? "확대" : "최소화"}
+              >
+                {isMinimized ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                )}
+              </button>
             </div>
-            <div className="p-8 flex flex-col gap-6 text-center">
-              <div>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1">Your Word</p>
-                <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase">{myGameData?.word}</h2>
+
+            {/* 본문 섹션 */}
+            <div className={`p-6 flex flex-col gap-4 text-center transition-all ${isMinimized ? 'p-4' : 'p-8 gap-6'}`}>
+              <div className={isMinimized ? "flex items-center justify-between" : ""}>
+                <p className={`font-black uppercase tracking-widest text-slate-400 ${isMinimized ? 'text-[8px]' : 'text-[10px] mb-1'}`}>
+                  Your Word
+                </p>
+                <h2 className={`font-black text-slate-900 tracking-tighter italic uppercase ${isMinimized ? 'text-xl' : 'text-4xl'}`}>
+                  {myGameData?.word}
+                </h2>
               </div>
-              <form onSubmit={handleNextTurn} className="space-y-4">
-                <input
-                  autoFocus
-                  type="text"
-                  value={descInput}
-                  onChange={handleDescInputChange}
-                  placeholder="단어에 대해 설명해주세요"
-                  className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-center text-xl focus:border-blue-600 transition-all"
-                />
-                <div className="flex flex-col gap-2">
-                  <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-100 uppercase italic transition-all">
+
+              {!isMinimized && (
+                <form onSubmit={handleNextTurn} className="space-y-4">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={descInput}
+                    onChange={handleDescInputChange}
+                    placeholder="단어에 대해 설명해주세요"
+                    className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-center text-xl focus:border-blue-600 transition-all"
+                  />
+                  <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-100 uppercase italic">
                     설명 완료 ({timeLeft}s)
                   </button>
+                </form>
+              )}
+              
+              {isMinimized && (
+                <div className="flex items-center gap-2">
+                   <div className="flex-1 h-10 bg-slate-50 rounded-xl flex items-center px-3 text-xs font-bold text-slate-400 truncate">
+                     {descInput || "입력 중..."}
+                   </div>
+                   <div className="bg-rose-500 text-white w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm">
+                     {timeLeft}
+                   </div>
                 </div>
-              </form>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 라이어 정답 추리 모달 (Red 테마 - 이 때만 레드 적용) */}
+      {/* 라이어 정답 추리 모달 (최소화 기능 적용) */}
       {gameStatus === "LIAR_GUESS" && isLiar && !isSpectator && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-rose-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border-4 border-rose-500 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-rose-500 p-5 text-center">
-              <span className="text-white font-black text-xl italic uppercase tracking-tighter">Guess the Word!</span>
+        <div className={`fixed z-[60] transition-all duration-500 ease-in-out ${
+          isMinimized 
+          ? "bottom-4 right-4 w-72 md:w-80" 
+          : "inset-0 flex items-center justify-center p-4 bg-rose-900/60 backdrop-blur-sm"
+        }`}>
+          <div className={`bg-white rounded-[2.5rem] shadow-2xl border-4 border-rose-500 overflow-hidden transition-all duration-500 ${
+            isMinimized ? "scale-100" : "w-full max-w-lg animate-in zoom-in-95"
+          }`}>
+            <div className="bg-rose-500 p-4 flex justify-between items-center">
+              <span className={`text-white font-black italic uppercase tracking-tighter ${isMinimized ? 'text-sm' : 'text-xl mx-auto'}`}>
+                Guess the Word!
+              </span>
+              <button onClick={() => setIsMinimized(!isMinimized)} className="text-white/80 hover:text-white p-1">
+                {isMinimized ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                )}
+              </button>
             </div>
-            <div className="p-8 flex flex-col gap-6 text-center">
-              <div className="text-center">
-                <p className="text-[10px] text-rose-400 font-black uppercase tracking-[0.2em] mb-1">당신은 라이어였습니다!</p>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase">시민의 단어를 맞히세요</h2>
-              </div>
-              <form onSubmit={handleSubmitGuess} className="space-y-4">
-                <input
-                  autoFocus
-                  type="text"
-                  value={guessWord}
-                  onChange={handleGuessInputChange}
-                  placeholder="정답 입력..."
-                  className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-center text-xl focus:border-rose-500 transition-all"
-                />
-                <button className="w-full bg-rose-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-rose-700 shadow-xl shadow-rose-100 uppercase italic transition-all">
-                  정답 제출 ({timeLeft}s)
-                </button>
-              </form>
+            <div className={`p-6 flex flex-col gap-4 text-center ${isMinimized ? 'p-4' : 'p-8 gap-6'}`}>
+              {!isMinimized && (
+                <>
+                  <div>
+                    <p className="text-[10px] text-rose-400 font-black uppercase tracking-widest mb-1">당신은 라이어입니다</p>
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase">시민의 단어를 맞히세요</h2>
+                  </div>
+                  <form onSubmit={handleSubmitGuess} className="space-y-4">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={guessWord}
+                      onChange={handleGuessInputChange}
+                      placeholder="정답 입력..."
+                      className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-center text-xl focus:border-rose-500 transition-all"
+                    />
+                    <button className="w-full bg-rose-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-rose-700 shadow-xl shadow-rose-100 uppercase italic">
+                      정답 제출 ({timeLeft}s)
+                    </button>
+                  </form>
+                </>
+              )}
+              {isMinimized && (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-10 bg-slate-50 rounded-xl flex items-center px-3 text-xs font-bold text-rose-400 truncate">
+                    정답 추리 중: {guessWord || "..."}
+                  </div>
+                  <div className="bg-rose-600 text-white w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm">
+                    {timeLeft}s
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -332,7 +407,7 @@ function App() {
         <span className="font-black italic text-slate-800 tracking-tighter">🕵️ {roomId.toUpperCase()}</span>
         <div className="flex items-center gap-1.5">
           <button
-            onClick={() => setIsInfoVisible(!isInfoVisible)}
+           onClick={() => setIsInfoVisible(!isInfoVisible)}
             className="bg-slate-800 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform"
           >
             {isInfoVisible ? "HIDE INFO" : "SHOW INFO"}
@@ -347,20 +422,20 @@ function App() {
       </div>
 
       <div className="flex flex-col md:flex-row flex-1 p-2 md:p-4 gap-2 md:gap-4 overflow-hidden">
-        {/* 좌측 패널: 플레이어 정보 및 상태 */}
+        {/* 좌측 패널 */}
         <div className={`
           ${isInfoVisible ? 'flex' : 'hidden'}
           md:flex w-full md:w-1/3 flex-col gap-2 md:gap-4 overflow-hidden h-full shrink-0
           max-h-[50vh] md:max-h-full transition-all duration-300
         `}>
-          {/* 프로필 카드 */}
+          {/* 내 정보 카드 */}
           <div className="bg-white p-3 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-3 md:gap-4">
-            <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-2 md:border-4 border-white shadow-inner text-lg md:text-2xl">
-                👤
-                </div>
-              <div className="flex flex-col">
+            <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-2 md:border-4 border-white text-lg md:text-2xl">
+              👤
+              </div>
+            <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="font-black text-base md:text-xl text-slate-900 leading-none truncate max-w-[100px] md:max-w-none">{name}</span>
+                <span className="font-black text-base md:text-xl text-slate-900 leading-none truncate max-w-[100px]">{name}</span>
                 <span className="bg-blue-600 text-white text-[8px] md:text-[10px] px-1.5 py-0.5 rounded-full font-black uppercase">Me</span>
                 {isSpectator && (
                   <span className="text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter shrink-0 border bg-indigo-50 border-indigo-200 text-indigo-600 ml-1">
@@ -379,7 +454,7 @@ function App() {
             )}
           </div>
 
-          {/* 플레이어 리스트 카드 */}
+          {/* 플레이어 리스트 및 상태 */}
           <div className="bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
             <h2 className="text-base md:text-xl font-black mb-2 md:mb-4 border-b pb-2 flex justify-between items-center shrink-0 uppercase italic text-slate-400">
               {gameStatus === "LOBBY" ? "🏠 Lobby" :
@@ -389,7 +464,6 @@ function App() {
             </h2>
 
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* 내 카드 정보 (고정) */}
               {(gameStatus === "PLAYING" || gameStatus === "VOTING" || gameStatus === "LIAR_GUESS") && myGameData && (
                 <div className="mb-3 p-4 bg-blue-600 rounded-[1.5rem] text-center shadow-lg shadow-blue-100 shrink-0">
                   <p className="text-[8px] text-blue-200 font-black mb-0.5 uppercase tracking-widest">Category: {myGameData.category}</p>
@@ -398,7 +472,7 @@ function App() {
               )}
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {players.map((p) => (
+                {players.map((p) => (
                   <div key={p.id}
                     className={`p-3 md:p-4 rounded-2xl flex justify-between items-center border-2 transition-all ${currentTurnId === p.id ? "bg-amber-50 border-amber-400 shadow-md" : "bg-white border-slate-50"
                       } ${socket.id === p.id ? "ring-2 ring-blue-600/10" : ""}`}
@@ -427,25 +501,24 @@ function App() {
                         <span className={"text-[9px] font-black px-2 py-0.5 rounded-md uppercase border bg-indigo-50 border-indigo-200 text-indigo-600"}>Spectator</span>
                       )}
                     </div>
-                  {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
+                    {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
                       <button
                         onClick={() => handleVote(p.id)}
                         className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors uppercase italic shadow-sm"
                       >
                         VOTE
                       </button>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* 하단 컨트롤 바 (로비 전용) */}
-          <div className="bg-white p-3 rounded-[1.5rem] border border-slate-200 shadow-sm">
+          <div className="bg-white p-3 rounded-[1.5rem] border border-slate-200 shadow-sm shrink-0">
             {gameStatus === "LOBBY" ? (
               myInfo?.isHost ? (
-                <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 shadow-lg shadow-blue-100 uppercase italic">Start Game</button>
+                <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 shadow-lg shadow-blue-100 uppercase italic">게임 시작</button>
               ) : (
                 <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100"}`}>
                   {myInfo?.isReady ? "준비완료" : "준비"}
@@ -458,7 +531,7 @@ function App() {
                   <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
                   {myInfo?.isReady ? "준비완료" : "준비"}
                 </button>
-                )
+              )
             ) : (
               <div className="text-center py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest italic animate-pulse">
                 {gameStatus} in progress
@@ -467,7 +540,7 @@ function App() {
           </div>
         </div>
 
-        {/* 우측 패널: 채팅 및 시스템 알림 */}
+        {/* 우측 채팅 패널 */}
         <div className="flex-1 bg-white rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full min-h-0">
           <div className="p-4 border-b border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
             <h3 className="font-black text-slate-800 italic uppercase text-xs flex items-center gap-2">
@@ -491,7 +564,7 @@ function App() {
                 )}
                 <div className={`px-5 py-3 rounded-[1.5rem] max-w-[85%] break-all shadow-sm font-bold text-sm ${
                   chat.author === 'SYSTEM' ? "bg-slate-900 text-white mx-auto text-center rounded-2xl text-[10px] py-1.5 uppercase" :
-                  chat.author === 'SYSTEM_DESC' ? "bg-blue-600 text-white rounded-[1.5rem] w-full text-center py-6 font-black italic text-xl shadow-xl shadow-blue-100 scale-[0.98] animate-in slide-in-from-bottom-2" :
+                  chat.author === 'SYSTEM_DESC' ? "bg-blue-600 text-white rounded-[1.5rem] w-full text-center py-6 font-black italic text-xl shadow-xl shadow-blue-100 animate-in slide-in-from-bottom-2" :
                   chat.author === name ? "bg-blue-600 text-white rounded-tr-none shadow-blue-100" : "bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-none"
                 }`}>
                   {chat.message}
