@@ -37,9 +37,8 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(0);
 
   const chatEndRef = useRef(null);
-  // ref를 사용하여 handleNextTurn 내부의 최신 상태값에 접근 (타이머 0초 시 자동 전송용)
   const descInputRef = useRef("");
-  const guessWordRef = useRef(""); // 라이어 정답 참조용 추가
+  const guessWordRef = useRef(""); 
   const currentTurnIdRef = useRef("");
   const gameStatusRef = useRef("LOBBY");
 
@@ -81,21 +80,14 @@ function App() {
     socket.on("update-turn", (id) => setCurrentTurnId(id));
     socket.on("update-voted-count", (count) => setVotedCount(count));
 
-    // 타이머 이벤트 수신 로직 보완
     socket.on("timer-tick", (time) => {
       setTimeLeft(time);
-
-      // 누락된 부분: 시간이 0이 되었을 때 내 턴이라면 자동 전송 혹은 초기화 로직
       if (time === 0) {
-        // 1. 일반 설명 단계 시간 초과
         if (gameStatusRef.current === "PLAYING" && currentTurnIdRef.current === socket.id) {
-          // 시간이 다 되면 현재까지 입력한 내용이라도 강제 제출 (서버에서 다음 턴으로 넘김)
           socket.emit("next-turn", descInputRef.current || "시간 초과로 설명을 건너뜁니다.");
           setDescInput("");
         }
-        // 2. 라이어 정답 제출 단계 시간 초과
         if (gameStatusRef.current === "LIAR_GUESS" && myGameData?.role === "LIAR") {
-          // 라이어가 0초까지 정답을 못 적으면 오답 처리 유도
           socket.emit("submit-guess", guessWordRef.current || "시간 초과");
           setGuessWord("");
         }
@@ -105,7 +97,7 @@ function App() {
     socket.on("game-result", (result) => {
       setGameResult(result);
       setGameStatus("RESULT");
-      setTimeLeft(0); // 결과창 진입 시 타이머 초기화 (잔상 제거)
+      setTimeLeft(0);
     });
 
     socket.on("error-message", (msg) => {
@@ -125,7 +117,7 @@ function App() {
       socket.off("game-result");
       socket.off("error-message");
     };
-  }, [gameStatus]); // gameStatus가 바뀔 때 리스너 내부 분기 처리를 위해 의존성 추가
+  }, [myGameData]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -162,10 +154,7 @@ function App() {
 
   const handleGuessInputChange = (e) => {
     const val = e.target.value;
-    setGuessWord(val); // 로컬 상태 업데이트
-
-    // 라이어 정답 추리 단계(LIAR_GUESS)일 때만 서버에 실시간 입력값 전송
-    // (보통 클라이언트의 gameStatus 상태값이 'LIAR_GUESS'인지 체크하면 됩니다)
+    setGuessWord(val);
     if (gameStatus === 'LIAR_GUESS') {
       socket.emit("update-input", val);
     }
@@ -196,24 +185,24 @@ function App() {
 
   const handleExit = () => {
     if (!window.confirm("정말 방에서 나가시겠습니까?")) return;
-
-    // 1. 소켓 연결을 물리적으로 끊음 -> 서버의 'disconnect' 로직이 즉시 실행됨
     socket.disconnect();
-
-    // 2. UI 상태 초기화 (입장 전 화면으로 이동)
     setIsJoined(false);
     setGameStatus("LOBBY");
     setChatLog([]);
-
-    // 3. 나중에 다시 입장하고 싶을 수도 있으므로 소켓 재연결 준비
-    // (이 로직이 없으면 다음에 입장할 때 연결이 안 될 수 있음)
     socket.connect();
   };
 
+  // 공통 변수 계산
+  const myInfo = players.find(p => p.id === socket.id);
+  const isMyTurn = currentTurnId === socket.id && gameStatus === "PLAYING";
+  const isLiar = myGameData?.role === "LIAR";
+  const isSpectator = myInfo?.userType === 'SPECTATOR';
+  const activePlayersCount = players.filter(p => p.userType === 'PLAYER').length;
+  const isTimerActive = ["PLAYING", "VOTING", "LIAR_GUESS"].includes(gameStatus);
 
   if (!isJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 relative">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 relative font-sans">
         {showError && (
           <div className="absolute top-10 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black text-sm uppercase">
             ⚠ {showError}
@@ -258,29 +247,81 @@ function App() {
     );
   }
 
-  // 1. 관전자 및 플레이어 관련 상태 계산 (render 함수 상단에 위치)
-  const myInfo = players.find(p => p.id === socket.id);
-  const isMyTurn = currentTurnId === socket.id && gameStatus === "PLAYING";
-  const isLiar = myGameData?.role === "LIAR";
-
-  // 현재 접속자가 관전자인지 확인
-  const isSpectator = myInfo?.userType === 'SPECTATOR';
-
-  // 투표 인원 계산 시 실제 플레이어(PLAYER)만 필터링 (관전자 제외)
-  const activePlayersCount = players.filter(p => p.userType === 'PLAYER').length;
-  const isTimerActive = ["PLAYING", "VOTING", "LIAR_GUESS"].includes(gameStatus);
-
   return (
-    <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans">
+    <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans relative">
+      {/* 에러 알림 */}
       {showError && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black text-sm uppercase">
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-bounce font-black text-sm uppercase">
           ⚠ {showError}
         </div>
       )}
 
+      {/* [모달 통합] 내 차례일 때 중앙 입력 모달 */}
+      {isMyTurn && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border-4 border-amber-400 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="bg-amber-400 p-4 text-center">
+              <span className="text-amber-900 font-black text-xl italic uppercase tracking-tighter">Your Turn!</span>
+            </div>
+            <div className="p-8 flex flex-col gap-6">
+              <div className="text-center">
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1">Your Word</p>
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase">{myGameData?.word}</h2>
+              </div>
+              <form onSubmit={handleNextTurn} className="space-y-4">
+                <input
+                  autoFocus
+                  type="text"
+                  value={descInput}
+                  onChange={handleDescInputChange}
+                  placeholder="단어에 대해 설명해주세요..."
+                  className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] outline-none font-black text-center text-xl focus:border-amber-400 transition-all"
+                />
+                <div className="flex flex-col gap-2">
+                  <button type="submit" className="w-full bg-amber-400 text-amber-900 py-5 rounded-[1.5rem] font-black text-xl hover:bg-amber-500 shadow-xl shadow-amber-100 uppercase italic border-b-4 border-amber-600 active:translate-y-1 active:border-b-0 transition-all">
+                    설명 완료 ({timeLeft}s)
+                  </button>
+                  <p className="text-[10px] text-center text-slate-400 font-bold uppercase">설명을 마치면 자동으로 다음 사람에게 턴이 넘어갑니다.</p>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* [모달 통합] 라이어 정답 추리 모달 */}
+      {gameStatus === "LIAR_GUESS" && isLiar && !isSpectator && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-rose-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border-4 border-rose-500 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="bg-rose-500 p-4 text-center">
+              <span className="text-white font-black text-xl italic uppercase tracking-tighter">Guess the Word!</span>
+            </div>
+            <div className="p-8 flex flex-col gap-6">
+              <div className="text-center">
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1">You are the LIAR</p>
+                <h2 className="text-2xl font-black text-rose-600 tracking-tighter italic uppercase">시민들의 제시어를 맞히세요</h2>
+              </div>
+              <form onSubmit={handleSubmitGuess} className="space-y-4">
+                <input
+                  autoFocus
+                  type="text"
+                  value={guessWord}
+                  onChange={handleGuessInputChange}
+                  placeholder="정답 입력..."
+                  className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] outline-none font-black text-center text-xl focus:border-rose-500 transition-all"
+                />
+                <button className="w-full bg-rose-600 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-rose-700 shadow-xl shadow-rose-100 uppercase italic border-b-4 border-rose-800 active:translate-y-1 active:border-b-0 transition-all">
+                  정답 제출 ({timeLeft}s)
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 모바일 헤더 */}
       <div className="md:hidden bg-white/80 backdrop-blur-sm p-3 flex justify-between items-center border-b shrink-0 z-40">
         <span className="font-black italic text-slate-800 tracking-tighter">🕵️ {roomId.toUpperCase()}</span>
-        {/* [수정] gap을 조절하여 두 버튼 사이의 간격을 좁게 밀착시킴 */}
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setIsInfoVisible(!isInfoVisible)}
@@ -288,7 +329,6 @@ function App() {
           >
             {isInfoVisible ? "HIDE INFO" : "SHOW INFO"}
           </button>
-
           <button
             onClick={handleExit}
             className="bg-rose-50 text-rose-600 border-2 border-rose-200 px-3 py-1.5 rounded-full text-[10px] font-black uppercase shadow-sm active:scale-95 transition-all duration-300 hover:bg-rose-600 hover:text-white hover:border-rose-600"
@@ -299,11 +339,13 @@ function App() {
       </div>
 
       <div className="flex flex-col md:flex-row flex-1 p-2 md:p-4 gap-2 md:gap-4 overflow-hidden">
+        {/* 좌측 패널: 플레이어 정보 및 상태 */}
         <div className={`
           ${isInfoVisible ? 'flex' : 'hidden'} 
           md:flex w-full md:w-1/3 flex-col gap-2 md:gap-4 overflow-hidden h-full shrink-0
           max-h-[50vh] md:max-h-full transition-all duration-300
         `}>
+          {/* 프로필 카드 */}
           <div className="bg-white p-3 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-3 md:gap-4">
             <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-2 md:border-4 border-white shadow-inner text-lg md:text-2xl">
               👤
@@ -322,7 +364,6 @@ function App() {
                 SCORE: <span className="text-blue-600">{myInfo?.score || 0}</span> | {myInfo?.isHost ? "HOST 👑" : "MEMBER"}
               </span>
             </div>
-            {/* 상시 타이머 (정답 제출 단계 포함) */}
             {isTimerActive && (
               <div className={`ml-auto px-4 py-2 rounded-2xl border-2 font-black text-xl ${timeLeft <= 5 ? 'bg-rose-50 border-rose-400 text-rose-600 animate-pulse' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
                 {timeLeft}s
@@ -330,39 +371,39 @@ function App() {
             )}
           </div>
 
+          {/* 플레이어 리스트 카드 */}
           <div className="bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
-            <h2 className="text-base md:text-xl font-black mb-2 md:mb-4 border-b pb-2 flex justify-between items-center shrink-0 uppercase italic">
-              <span>
-                {gameStatus === "LOBBY" ? "🏠 Lobby" :
-                  gameStatus === "VOTING" ? "🗳 Voting" :
-                    gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
-                      gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
-              </span>
+            <h2 className="text-base md:text-xl font-black mb-2 md:mb-4 border-b pb-2 flex justify-between items-center shrink-0 uppercase italic text-slate-400">
+              {gameStatus === "LOBBY" ? "🏠 Lobby" :
+               gameStatus === "VOTING" ? "🗳 Voting" :
+               gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
+               gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
             </h2>
 
             <div className="flex-1 flex flex-col overflow-hidden">
+              {/* 내 카드 정보 (고정) */}
               {(gameStatus === "PLAYING" || gameStatus === "VOTING" || gameStatus === "LIAR_GUESS") && myGameData && (
-                <div className="mb-3 p-3 bg-blue-50 rounded-2xl text-center border border-blue-100 shrink-0">
-                  <p className="text-[8px] text-blue-400 font-black mb-0.5 uppercase tracking-widest">Category: {myGameData.category}</p>
-                  <p className="text-xl md:text-2xl font-black text-blue-900 tracking-tighter">{myGameData.word}</p>
+                <div className="mb-3 p-4 bg-blue-600 rounded-[1.5rem] text-center shadow-lg shadow-blue-100 shrink-0">
+                  <p className="text-[8px] text-blue-200 font-black mb-0.5 uppercase tracking-widest">Category: {myGameData.category}</p>
+                  <p className="text-2xl font-black text-white tracking-tighter italic uppercase">{myGameData.word}</p>
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {players.map((p) => (
                   <div key={p.id}
-                    className={`p-3 md:p-4 rounded-xl flex justify-between items-center border-2 transition-all ${currentTurnId === p.id ? "bg-amber-50 border-amber-400 shadow-sm" : "bg-white border-slate-50"
-                      } ${socket.id === p.id ? "ring-1 ring-blue-400" : ""}`}
+                    className={`p-3 md:p-4 rounded-2xl flex justify-between items-center border-2 transition-all ${currentTurnId === p.id ? "bg-amber-50 border-amber-400 shadow-md" : "bg-white border-slate-50"
+                      } ${socket.id === p.id ? "ring-2 ring-blue-600/10" : ""}`}
                   >
                     <div className="flex items-center gap-2 truncate">
                       <div className="flex items-center gap-1.5 truncate">
-                        {p.isHost && <span className="text-xs" title="방장">👑</span>}
-                        <span className={`font-bold text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-700 font-black" : "text-slate-700"}`}>
+                        {p.isHost && <span className="text-xs">👑</span>}
+                        <span className={`font-black text-xs md:text-sm truncate ${socket.id === p.id ? "text-blue-600" : "text-slate-700"}`}>
                           {p.name}
                         </span>
                       </div>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
-                        {p.score || 0}pt
+                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">
+                        {p.score || 0}P
                       </span>
                       {currentTurnId === p.id && gameStatus === "PLAYING" && (
                         <span className="text-[8px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse uppercase shrink-0">Turn</span>
@@ -381,9 +422,9 @@ function App() {
                     {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
                       <button
                         onClick={() => handleVote(p.id)}
-                        className="bg-rose-500 text-white text-[10px] px-3 py-1 rounded-lg font-black hover:bg-rose-600 transition-colors uppercase shadow-sm shrink-0"
+                        className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors uppercase italic shadow-sm"
                       >
-                        지목
+                        VOTE
                       </button>
                     )}
                   </div>
@@ -392,60 +433,33 @@ function App() {
             </div>
           </div>
 
-          <div className={`bg-white p-4 rounded-2xl shadow-sm border-2 transition-all duration-500 ${isMyTurn ? "border-amber-400 ring-8 ring-amber-100/50 scale-105 z-20 shadow-2xl" : "border-slate-200"}`}>
+          {/* 하단 컨트롤 바 (로비 전용) */}
+          <div className="bg-white p-3 rounded-[1.5rem] border border-slate-200 shadow-sm">
             {gameStatus === "LOBBY" ? (
               myInfo?.isHost ? (
-                <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 active:scale-95 shadow-xl shadow-blue-100 uppercase italic">게임 시작</button>
+                <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 shadow-lg shadow-blue-100 uppercase italic">Start Game</button>
               ) : (
-                <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
+                <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100"}`}>
                   {myInfo?.isReady ? "준비완료" : "준비"}
                 </button>
-              )
-            ) : gameStatus === "VOTING" ? (
-              <div className="text-center py-4 bg-rose-50 rounded-2xl border-2 border-dashed border-rose-200 font-black uppercase text-xs text-rose-600 animate-pulse">
-                {isSpectator ? "Voting in Progress..." : (hasVoted ? `Voted (${votedCount}/${activePlayersCount})` : "Who is the Liar?")}
-              </div>
-            ) : gameStatus === "LIAR_GUESS" ? (
-              isLiar && !isSpectator ? (
-                <form onSubmit={handleSubmitGuess} className="space-y-2">
-                  <input
-                    type="text"
-                    value={guessWord}
-                    onChange={handleGuessInputChange}
-                    placeholder="시민의 단어를 입력하세요"
-                    className="w-full p-3 bg-slate-50 border-2 border-slate-100 rounded-xl outline-none font-bold text-center focus:border-rose-400 transition-all text-sm"
-                  />
-                  <button className="w-full bg-rose-600 text-white py-3 rounded-xl font-black hover:bg-rose-700 shadow-lg uppercase italic">정답 제출</button>
-                </form>
-              ) : (
-                <div className="text-center py-4 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 text-blue-600 font-black text-xs animate-pulse">LIAR IS GUESSING... ({timeLeft}s)</div>
               )
             ) : gameStatus === "RESULT" ? (
-              myInfo?.isHost ? (
-                <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 shadow-xl shadow-blue-100 uppercase italic">다시 시작</button>
-              ) : (
-                <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
+                myInfo?.isHost ? (
+                  <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 uppercase italic">다시 시작</button>
+                ) : (
+                  <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
                   {myInfo?.isReady ? "준비완료" : "준비"}
                 </button>
-              )
-            ) : isMyTurn && !isSpectator ? (
-              <form onSubmit={handleNextTurn} className="space-y-2">
-                {/* <div className="text-xs font-black text-amber-500 text-center animate-bounce uppercase">Your Turn!</div> */}
-                <input
-                  type="text"
-                  value={descInput}
-                  onChange={handleDescInputChange}
-                  placeholder="단어에 대해 설명해주세요!"
-                  className="w-full p-3 bg-amber-50 border-2 border-amber-200 rounded-xl outline-none font-bold text-center focus:border-amber-500 transition-all text-sm"
-                />
-                <button type="submit" className="w-full bg-amber-400 text-amber-900 py-3 rounded-xl font-black hover:bg-amber-500 shadow-lg uppercase italic border-b-4 border-amber-600 active:translate-y-1 active:border-b-0 transition-all">설명 완료</button>
-              </form>
+                )
             ) : (
-              <div className="text-center py-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 font-black text-xs italic animate-pulse">DESCRIBING... ({timeLeft}s)</div>
+              <div className="text-center py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest italic animate-pulse">
+                {gameStatus} in progress
+              </div>
             )}
           </div>
         </div>
 
+        {/* 우측 패널: 채팅 및 시스템 알림 */}
         <div className="flex-1 bg-white rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full min-h-0">
           <div className="p-4 border-b border-slate-50 bg-slate-50/20 flex justify-between items-center shrink-0">
             <h3 className="font-black text-slate-800 italic uppercase text-xs flex items-center gap-2">
@@ -453,24 +467,25 @@ function App() {
             </h3>
             <button
               onClick={handleExit}
-              className="hidden md:flex text-[10px] font-bold px-3 py-1.5 rounded-xl uppercase border-2 border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all duration-300 flex items-center gap-1.5 shadow-sm active:scale-95"
+              className="hidden md:flex text-[10px] font-black px-4 py-2 rounded-xl uppercase border-2 border-rose-100 bg-white text-rose-500 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all duration-300"
             >
               Exit Room
             </button>
           </div>
 
-          <div className={`flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden transition-all duration-500 ${isMyTurn && gameStatus ? "opacity-50" : "opacity-100"}`}>
-            {chatLog.map((chat) => (
-              <div key={chat.id} className={`flex flex-col ${chat.author === name ? "items-end" : chat.author === 'SYSTEM_DESC' ? "items-center" : "items-start"}`}>
+          <div className="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar">
+            {chatLog.map((chat, idx) => (
+              <div key={idx} className={`flex flex-col ${chat.author === name ? "items-end" : chat.author === 'SYSTEM_DESC' ? "items-center" : "items-start"}`}>
                 {chat.author !== 'SYSTEM_DESC' && (
                   <span className={`text-[9px] font-black mb-1 px-2 uppercase tracking-tighter ${chat.author === 'SYSTEM' ? 'text-blue-500' : 'text-slate-400'}`}>
                     {chat.author === name ? "Me" : chat.author}
                   </span>
                 )}
-                <div className={`px-4 py-2 rounded-[1.2rem] max-w-[85%] break-all shadow-sm font-medium text-sm ${chat.author === 'SYSTEM' ? "bg-slate-800 text-white mx-auto text-center rounded-2xl text-[11px] py-1.5" :
-                  chat.author === 'SYSTEM_DESC' ? "bg-blue-100 text-blue-900 border-2 border-blue-400 rounded-2xl w-full text-center py-3 font-black italic text-base" :
-                    chat.author === name ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
-                  }`}>
+                <div className={`px-5 py-3 rounded-[1.5rem] max-w-[85%] break-all shadow-sm font-bold text-sm ${
+                  chat.author === 'SYSTEM' ? "bg-slate-900 text-white mx-auto text-center rounded-2xl text-[10px] py-1.5 uppercase" :
+                  chat.author === 'SYSTEM_DESC' ? "bg-blue-600 text-white rounded-[1.5rem] w-full text-center py-6 font-black italic text-xl shadow-xl shadow-blue-100 scale-[0.98] animate-in slide-in-from-bottom-2" :
+                  chat.author === name ? "bg-blue-600 text-white rounded-tr-none shadow-blue-100" : "bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-none"
+                }`}>
                   {chat.message}
                 </div>
               </div>
@@ -480,15 +495,22 @@ function App() {
 
           <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-50 flex gap-2 shrink-0">
             <input
-              className={`flex-1 p-3 bg-slate-50 rounded-xl outline-none font-bold text-slate-700 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm ${isMyTurn && gameStatus === "PLAYING" ? "opacity-20 pointer-events-none" : "opacity-100"}`}
+              className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none font-black text-slate-700 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm"
               placeholder="메시지 전송..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
-            <button className="bg-blue-600 text-white px-6 rounded-xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-50 uppercase italic text-sm">Send</button>
+            <button className="bg-blue-600 text-white px-8 rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-100 uppercase italic text-sm">Send</button>
           </form>
         </div>
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+      `}</style>
     </div>
   );
 }
