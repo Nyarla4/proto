@@ -408,16 +408,18 @@ io.on('connection', (socket) => {
             room.players[0].isReady = true;
           }
 
-          if (room.status !== 'LOBBY' && room.status !== 'RESULT') {
-            stopTimer(roomId); // 나갔을 때 타이머 중지
-            if (leftPlayer.role === 'LIAR') {
-              io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: '라이어가 나갔습니다! 시민의 승리입니다.' });
-              room.status = 'LOBBY';
-            } else if (room.players.length < 3) {
-              io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: '인원 부족으로 게임이 종료됩니다.' });
-              room.status = 'LOBBY';
+          if (leftPlayer.userType == 'PLAYER') {
+            if (room.status !== 'LOBBY' && room.status !== 'RESULT') {
+              stopTimer(roomId); // 나갔을 때 타이머 중지
+              if (leftPlayer.role === 'LIAR') {
+                io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: '라이어가 나갔습니다! 시민의 승리입니다.' });
+                room.status = 'LOBBY';
+              } else if (room.players.length < 3) {
+                io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: '인원 부족으로 게임이 종료됩니다.' });
+                room.status = 'LOBBY';
+              }
+              io.to(roomId).emit('update-game-status', room.status);
             }
-            io.to(roomId).emit('update-game-status', room.status);
           }
 
           io.to(roomId).emit('update-players', room.players);
