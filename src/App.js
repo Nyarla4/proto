@@ -192,12 +192,10 @@ function App() {
     socket.connect();
   };
 
-  // 공통 변수 계산
   const myInfo = players.find(p => p.id === socket.id);
   const isMyTurn = currentTurnId === socket.id && gameStatus === "PLAYING";
   const isLiar = myGameData?.role === "LIAR";
   const isSpectator = myInfo?.userType === 'SPECTATOR';
-  const activePlayersCount = players.filter(p => p.userType === 'PLAYER').length;
   const isTimerActive = ["PLAYING", "VOTING", "LIAR_GUESS"].includes(gameStatus);
 
   if (!isJoined) {
@@ -249,22 +247,21 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans relative">
-      {/* 에러 알림 */}
       {showError && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-bounce font-black text-sm uppercase">
           ⚠ {showError}
         </div>
       )}
 
-      {/* [모달 통합] 내 차례일 때 중앙 입력 모달 */}
+      {/* 일반 플레이 모달 (White & Blue 테마) */}
       {isMyTurn && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border-4 border-amber-400 overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="bg-amber-400 p-4 text-center">
-              <span className="text-amber-900 font-black text-xl italic uppercase tracking-tighter">Your Turn!</span>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-blue-600 p-5 text-center">
+              <span className="text-white font-black text-xl italic uppercase tracking-tighter">Your Turn</span>
             </div>
-            <div className="p-8 flex flex-col gap-6">
-              <div className="text-center">
+            <div className="p-8 flex flex-col gap-6 text-center">
+              <div>
                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1">Your Word</p>
                 <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase">{myGameData?.word}</h2>
               </div>
@@ -274,14 +271,13 @@ function App() {
                   type="text"
                   value={descInput}
                   onChange={handleDescInputChange}
-                  placeholder="단어에 대해 설명해주세요..."
-                  className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] outline-none font-black text-center text-xl focus:border-amber-400 transition-all"
+                  placeholder="단어에 대해 설명해주세요"
+                  className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-center text-xl focus:border-blue-600 transition-all"
                 />
                 <div className="flex flex-col gap-2">
-                  <button type="submit" className="w-full bg-amber-400 text-amber-900 py-5 rounded-[1.5rem] font-black text-xl hover:bg-amber-500 shadow-xl shadow-amber-100 uppercase italic border-b-4 border-amber-600 active:translate-y-1 active:border-b-0 transition-all">
+                  <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-100 uppercase italic transition-all">
                     설명 완료 ({timeLeft}s)
                   </button>
-                  <p className="text-[10px] text-center text-slate-400 font-bold uppercase">설명을 마치면 자동으로 다음 사람에게 턴이 넘어갑니다.</p>
                 </div>
               </form>
             </div>
@@ -289,17 +285,17 @@ function App() {
         </div>
       )}
 
-      {/* [모달 통합] 라이어 정답 추리 모달 */}
+      {/* 라이어 정답 추리 모달 (Red 테마 - 이 때만 레드 적용) */}
       {gameStatus === "LIAR_GUESS" && isLiar && !isSpectator && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-rose-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border-4 border-rose-500 overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="bg-rose-500 p-4 text-center">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border-4 border-rose-500 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-rose-500 p-5 text-center">
               <span className="text-white font-black text-xl italic uppercase tracking-tighter">Guess the Word!</span>
             </div>
-            <div className="p-8 flex flex-col gap-6">
+            <div className="p-8 flex flex-col gap-6 text-center">
               <div className="text-center">
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-1">You are the LIAR</p>
-                <h2 className="text-2xl font-black text-rose-600 tracking-tighter italic uppercase">시민들의 제시어를 맞히세요</h2>
+                <p className="text-[10px] text-rose-400 font-black uppercase tracking-[0.2em] mb-1">당신은 라이어였습니다!</p>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tighter italic uppercase">시민의 단어를 맞히세요</h2>
               </div>
               <form onSubmit={handleSubmitGuess} className="space-y-4">
                 <input
@@ -308,9 +304,9 @@ function App() {
                   value={guessWord}
                   onChange={handleGuessInputChange}
                   placeholder="정답 입력..."
-                  className="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] outline-none font-black text-center text-xl focus:border-rose-500 transition-all"
+                  className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-black text-center text-xl focus:border-rose-500 transition-all"
                 />
-                <button className="w-full bg-rose-600 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-rose-700 shadow-xl shadow-rose-100 uppercase italic border-b-4 border-rose-800 active:translate-y-1 active:border-b-0 transition-all">
+                <button className="w-full bg-rose-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-rose-700 shadow-xl shadow-rose-100 uppercase italic transition-all">
                   정답 제출 ({timeLeft}s)
                 </button>
               </form>
@@ -341,16 +337,16 @@ function App() {
       <div className="flex flex-col md:flex-row flex-1 p-2 md:p-4 gap-2 md:gap-4 overflow-hidden">
         {/* 좌측 패널: 플레이어 정보 및 상태 */}
         <div className={`
-          ${isInfoVisible ? 'flex' : 'hidden'} 
+          ${isInfoVisible ? 'flex' : 'hidden'}
           md:flex w-full md:w-1/3 flex-col gap-2 md:gap-4 overflow-hidden h-full shrink-0
           max-h-[50vh] md:max-h-full transition-all duration-300
         `}>
           {/* 프로필 카드 */}
           <div className="bg-white p-3 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-3 md:gap-4">
             <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-2 md:border-4 border-white shadow-inner text-lg md:text-2xl">
-              👤
-            </div>
-            <div className="flex flex-col">
+                👤
+                </div>
+              <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="font-black text-base md:text-xl text-slate-900 leading-none truncate max-w-[100px] md:max-w-none">{name}</span>
                 <span className="bg-blue-600 text-white text-[8px] md:text-[10px] px-1.5 py-0.5 rounded-full font-black uppercase">Me</span>
@@ -390,7 +386,7 @@ function App() {
               )}
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                {players.map((p) => (
+              {players.map((p) => (
                   <div key={p.id}
                     className={`p-3 md:p-4 rounded-2xl flex justify-between items-center border-2 transition-all ${currentTurnId === p.id ? "bg-amber-50 border-amber-400 shadow-md" : "bg-white border-slate-50"
                       } ${socket.id === p.id ? "ring-2 ring-blue-600/10" : ""}`}
@@ -419,16 +415,16 @@ function App() {
                         <span className={"text-[9px] font-black px-2 py-0.5 rounded-md uppercase border bg-indigo-50 border-indigo-200 text-indigo-600"}>Spectator</span>
                       )}
                     </div>
-                    {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
+                  {gameStatus === "VOTING" && !hasVoted && !isSpectator && p.id !== socket.id && p.userType === 'PLAYER' && (
                       <button
                         onClick={() => handleVote(p.id)}
                         className="bg-rose-500 text-white text-[10px] px-3 py-1.5 rounded-xl font-black hover:bg-rose-600 transition-colors uppercase italic shadow-sm"
                       >
                         VOTE
                       </button>
-                    )}
-                  </div>
-                ))}
+                  )}
+                </div>
+              ))}
               </div>
             </div>
           </div>
@@ -493,23 +489,21 @@ function App() {
             <div ref={chatEndRef} />
           </div>
 
-          <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-50 flex gap-2 shrink-0">
+          <form onSubmit={handleSendMessage} className="p-4 bg-white border-t flex gap-2">
             <input
-              className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none font-black text-slate-700 focus:bg-white border-2 border-transparent focus:border-blue-100 transition-all text-sm"
-              placeholder="메시지 전송..."
+              className="flex-1 p-4 bg-slate-50 rounded-2xl outline-none font-black text-slate-700 border-2 border-transparent focus:border-blue-100 transition-all text-sm"
+              placeholder="메시지 입력..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
-            <button className="bg-blue-600 text-white px-8 rounded-2xl font-black hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-100 uppercase italic text-sm">Send</button>
+            <button className="bg-blue-600 text-white px-8 rounded-2xl font-black uppercase italic shadow-lg shadow-blue-100">Send</button>
           </form>
         </div>
       </div>
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}</style>
     </div>
   );
