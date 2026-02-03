@@ -81,7 +81,16 @@ function App() {
       setIsMinimized(false); 
     });
 
-    socket.on("update-game-status", (status) => setGameStatus(status));
+    socket.on("update-game-status", (status) => {
+      setGameStatus(status);
+      // 라이어가 단어를 맞추는 단계(LIAR_GUESS)가 되었을 때
+      if (status === "LIAR_GUESS") {
+        // 본인이 라이어라면 모달을 다시 보여줌 (최소화 해제)
+        if (myGameData?.role === "LIAR") {
+          setIsMinimized(false);
+        }
+      }
+    });
     socket.on("update-turn", (id) => {
       setCurrentTurnId(id);
       if (id === socket.id) setIsMinimized(false); 
