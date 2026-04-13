@@ -491,28 +491,12 @@ app.get(/.*/, (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-
-console.log('⏳ 단어 DB 초기화 시도 중...');
-
-getWordDb()
-  .then(db => {
-    if (db && Object.keys(db).length > 0) {
-      cachedAllCategories = Object.keys(db);
-      console.log('✅ 단어 DB 및 카테고리 캐싱 완료:', cachedAllCategories);
-    } else {
-      // db가 null이거나, 데이터가 아예 없을 때 출력됨
-      console.warn('⚠️ 경고: DB 데이터를 불러오지 못했거나 등록된 카테고리가 없습니다.', db);
-    }
-    
-    // DB 성공 여부와 관계없이 일단 서버는 엽니다
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-  })
-  .catch(err => {
-    console.error('❌ DB 초기화 중 치명적 에러 발생:', err);
-    
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT} (DB 연결 실패 상태)`);
-    });
+getWordDb().then(db => {
+  if (db) {
+    cachedAllCategories = Object.keys(db);
+    console.log('단어 DB 및 카테고리 캐싱 완료:', cachedAllCategories);
+  }
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
   });
+});
