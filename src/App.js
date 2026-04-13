@@ -65,7 +65,23 @@ function App() {
       document.head.appendChild(script);
     }
 
-    socket.on("connect", () => setIsConnected(true));
+    // 1. 연결 성공 시
+    socket.on("connect", () => {
+      console.log("✅ 소켓 연결 성공! ID:", socket.id);
+      setIsConnected(true);
+    });
+
+    // 2. 연결 실패(에러) 시
+    socket.on("connect_error", (err) => {
+      console.error("❌ 소켓 연결 에러 발생:", err.message);
+      // 주소나 포트가 틀렸을 때 여기서 로그가 찍힙니다.
+    });
+
+    // 3. 연결 끊김 시
+    socket.on("disconnect", (reason) => {
+      console.warn("⚠️ 소켓 연결 끊김:", reason);
+      setIsConnected(false);
+    });
     socket.on("disconnect", () => setIsConnected(false));
     socket.on("update-players", (data) => setPlayers(data));
     socket.on("chat-message", (data) => setChatLog((prev) => [...prev, data]));
