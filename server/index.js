@@ -15,13 +15,58 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-const wordDb = {
-  "동물": ["강아지", "고양이", "사자", "호랑이", "코끼리", "기린", "펭귄", "토끼", "다람쥐", "판다"],
-  "과일": ["사과", "바나나", "포도", "딸기", "수박", "복숭아", "멜론"],
-  "직업": ["의사", "경찰관", "소방관", "선생님", "요리사", "판사", "프로그래머", "변호사", "가수", "운동선수", "과학자", "화가"],
-  "음식": ["피자", "비빔밥", "치킨", "햄버거", "떡볶이", "초밥", "파스타", "삼겹살", "짜장면", "냉면"],
-  "전자제품": ["스마트폰", "노트북", "냉장고", "세탁기", "에어컨", "텔레비전", "전자레인지", "청소기", "가습기", "이어폰"],
-  "운동": ["축구", "농구", "야구", "배구", "수영", "테니스", "골프", "배드민턴", "스케이트", "탁구"]
+// 신규: 하드코딩된 wordDb 객체를 통째로 삭제하고, DB 저장소 모듈을 불러옴
+const { getWordDb } = require('./db/wordRepository');
+
+// 신규: 게임 초기화 로직 분리 (start-game 내부의 로직을 함수로 분리하여 상단에 배치)
+const initializeGame = (io, roomId, room, activePlayers, socket, categoryName, liarWord, citizenWord, startTimerFunc, handleNextTurnFunc) => {
+  room.status = 'PLAYING';
+  room.category = categoryName;
+  room.liarWord = liarWord;
+  room.citizenWord = citizenWord;
+  room.votes = {};
+  room.votedCount = 0;
+  room.roundResults = { voteSuccess: false, guessSuccess: false };
+  room.currentTurnIndex = 0;
+  
+  room.turnOrder = activePlayers.map(p => p.id).sort(() => Math.random() - 0.5);
+
+  const liarIndex = Math.floor(Math.random() * activePlayers.length);
+  activePlayers.forEach((p, i) => {
+    p.role = (i === liarIndex) ? 'LIAR' : 'CITIZEN';
+    p.word = (p.role === 'LIAR') ? liarWord : citizenWord;
+    p.votedFor = '';     
+    p.currentInput = ''; 
+    io.to(p.id).emit('game-start', { role: p.role, word: p.word, category: categoryName });
+  });
+
+  const spectators = room.players.filter(p => p.userType === 'SPECTATOR');
+  spectators.forEach(p => {
+    p.role = 'SPECTATOR';
+    p.word = '(관전 중)';
+    p.votedFor = '';
+    p.currentInput = '';
+    io.to(p.id).emit('game-start', { role: 'SPECTATOR', word: '관전 중', category: categoryName });
+  });
+
+  io.to(roomId).emit('update-game-status', 'PLAYING');
+  io.to(roomId).emit('update-players', room.players);
+  io.to(roomId).emit('chat-message', { 
+    id: `sys-start-${Date.now()}`, 
+    author: 'SYSTEM', 
+    message: '게임을 시작합니다! 순서대로 단어를 설명해주세요.' 
+  });
+
+  const firstPlayerId = room.turnOrder[0];
+  if (firstPlayerId) {
+    io.to(roomId).emit('update-turn', firstPlayerId);
+    startTimerFunc(roomId, 30, () => {
+      const p = room.players.find(player => player.id === firstPlayerId);
+      const forcedDesc = (p && p.currentInput) ? p.currentInput : "(시간 초과)";
+      io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ [${p?.name || '알 수 없음'}]님 시간 초과!` });
+      handleNextTurnFunc(roomId, socket, forcedDesc);
+    });
+  }
 };
 
 const rooms = {};
@@ -273,69 +318,47 @@ io.on('connection', (socket) => {
     }
   };
 
-  // [중요] 게임 시작 시점의 로직 수정
-  socket.on('start-game', (roomId) => {
+  // 신규: async 핸들러로 변경
+  socket.on('start-game', async (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
 
-    // 1. 실제 게임에 참여하는 인원만 추출
     const activePlayers = room.players.filter(p => p.userType === 'PLAYER');
 
-    // 최소 인원 체크 등은 activePlayers 기준
-    if (activePlayers.length < 3) return socket.emit('error-message', '최소 3명이 필요합니다.');
-    if (!activePlayers.every(p => p.isReady)) return socket.emit('error-message', '모든 플레이어가 준비 완료 상태여야 합니다.');
-
-    const categories = Object.keys(wordDb);
-    const categoryName = categories[Math.floor(Math.random() * categories.length)];
-    const shuffledWords = [...wordDb[categoryName]].sort(() => Math.random() - 0.5);
-    const liarWord = shuffledWords[0];
-    const citizenWord = shuffledWords[1];
-    // 3. 역할 부여 (activePlayers 내에서만 라이어 선정)
-    const liarIndex = Math.floor(Math.random() * activePlayers.length);
-
-    room.status = 'PLAYING';
-    room.category = categoryName;
-    room.liarWord = liarWord;
-    room.citizenWord = citizenWord;
-    room.votes = {};
-    room.votedCount = 0;
-    room.roundResults = { voteSuccess: false, guessSuccess: false };
-    // 2. 턴 순서(turnOrder)는 반드시 activePlayers의 ID로만 구성
-    room.turnOrder = activePlayers.map(p => p.id).sort(() => Math.random() - 0.5);
-    room.currentTurnIndex = 0;
+    if (activePlayers.length < 3) {
+      return socket.emit('error-message', '최소 3명의 플레이어가 필요합니다.');
+    }
     
-    activePlayers.forEach((p, i) => {
-      const isLiar = i === liarIndex;
-      p.role = isLiar ? 'LIAR' : 'CITIZEN';
-      p.word = isLiar ? liarWord : citizenWord;
-      p.votedFor = '';
-      p.currentInput = '';
-      io.to(p.id).emit('game-start', { role: p.role, word: p.word, category: categoryName });
-    });
+    if (!activePlayers.every(p => p.isReady)) {
+      return socket.emit('error-message', '모든 플레이어가 준비 완료 상태여야 합니다.');
+    }
 
-    // SPECTATOR 처리
-    room.players.filter(p => p.userType === 'SPECTATOR').forEach(p => {
-      p.role = 'SPECTATOR';
-      p.word = '(관전 중)';
-      io.to(p.id).emit('game-start', { role: 'SPECTATOR', word: '관전 중', category: room.category });
-    });
+    try {
+      // 1. DB에서 데이터 불러오기
+      const wordDb = await getWordDb();
+      if (!wordDb) return socket.emit('error-message', '단어 DB를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
 
-    io.to(roomId).emit('update-game-status', 'PLAYING');
-    //io.to(roomId).emit('update-turn', room.turnOrder[room.currentTurnIndex]);
-    io.to(roomId).emit('update-players', room.players);
-    io.to(roomId).emit('chat-message', { id: 'sys-start', author: 'SYSTEM', message: '게임을 시작합니다! 순서대로 단어를 설명해주세요.' });
+      const categories = Object.keys(wordDb);
+      if (categories.length === 0) return socket.emit('error-message', 'DB에 등록된 단어 카테고리가 없습니다. 관리자에게 문의하세요.');
 
-    // [수정된 부분] 첫 번째 플레이어 턴 전송 및 타이머 시작
-    const firstPlayerId = room.turnOrder[0];
-    io.to(roomId).emit('update-turn', firstPlayerId);
+      // 2. 단어 추출 및 데이터 무결성 검증
+      const categoryName = categories[Math.floor(Math.random() * categories.length)];
+      const shuffledWords = [...wordDb[categoryName]].sort(() => Math.random() - 0.5);
+      
+      if (shuffledWords.length < 2) {
+        return socket.emit('error-message', `[${categoryName}] 카테고리에 단어가 부족합니다. (최소 2개 필요)`);
+      }
 
-    startTimer(roomId, 30, () => {
-      const p = room.players.find(player => player.id === firstPlayerId);
-      // 현재 입력 중인 내용이 있다면 그것을 사용, 없다면 "(시간 초과)" 메시지
-      const forcedDesc = p ? (p.currentInput || "(시간 초과)") : "";
-      io.to(roomId).emit('chat-message', { author: 'SYSTEM', message: `⏰ [${p?.name}]님 시간 초과!` });
-      handleNextTurnInternal(roomId, socket, forcedDesc);
-    });
+      const liarWord = shuffledWords[0];
+      const citizenWord = shuffledWords[1]; 
+
+      // 3. 검증된 데이터로 분리된 게임 초기화 함수 호출
+      initializeGame(io, roomId, room, activePlayers, socket, categoryName, liarWord, citizenWord, startTimer, handleNextTurnInternal);
+
+    } catch (err) {
+      console.error('start-game 비동기 처리 중 치명적 오류:', err);
+      socket.emit('error-message', '게임 시작 중 서버 오류가 발생했습니다.');
+    }
   });
 
   // 4. 턴 넘기기 (설명 내용 포함 버전으로 수정)
