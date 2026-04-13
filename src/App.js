@@ -40,6 +40,11 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [timeMax, setTimeMax] = useState(0);
 
+  const [roomSettings, setRoomSettings] = useState({
+    allCategories: [],
+    selectedCategories: []
+  });
+
   const chatEndRef = useRef(null);
   const descInputRef = useRef("");
   const guessWordRef = useRef(""); 
@@ -122,6 +127,8 @@ function App() {
       setShowError(msg);
       setTimeout(() => setShowError(""), 3000);
     });
+    
+    socket.on('update-room-settings', (settings) => setRoomSettings(settings));
 
     return () => {
       socket.off("update-players");
@@ -134,6 +141,7 @@ function App() {
       socket.off("timer-tick");
       socket.off("game-result");
       socket.off("error-message");
+      socket.off('update-room-settings');
     };
   }, [myGameData]);
 
@@ -215,6 +223,7 @@ function App() {
   const isMyTurn = currentTurnId === socket.id && gameStatus === "PLAYING";
   const isLiar = myGameData?.role === "LIAR";
   const isSpectator = myInfo?.userType === 'SPECTATOR';
+  const amIHost = myInfo?.isHost;
   const isTimerActive = ["PLAYING", "VOTING", "LIAR_GUESS"].includes(gameStatus);
 
   if (!isJoined) {
@@ -491,6 +500,31 @@ function App() {
               </div>
             </div>
           </div>
+          
+          {gameStatus === "LOBBY" && roomSettings.allCategories.length > 0 && (
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 w-full mb-3 text-left z-10 relative">
+                <h3 className="text-sm font-bold text-slate-600 mb-3 flex items-center justify-between">
+                  카테고리 설정
+                  <span className={`text-xs px-2 py-1 rounded-full ${amIHost ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {amIHost ? '방장 권한' : '방장만 변경 가능'}
+                  </span>
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {roomSettings.allCategories.map(cat => (
+                    <label key={cat} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${!amIHost ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'} ${roomSettings.selectedCategories.includes(cat) ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-slate-200 text-slate-500'}`}>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                        checked={roomSettings.selectedCategories.includes(cat)}
+                        disabled={!amIHost}
+                        onChange={(e) => socket.emit('toggle-category', roomId, cat, e.target.checked)}
+                      />
+                      {cat}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
           {/* PC 액션 패널 영역 (최초 클라이언트 설명 입력 위치) */}
           <div className="bg-white p-3 rounded-[1.5rem] border border-slate-200 shadow-sm shrink-0">

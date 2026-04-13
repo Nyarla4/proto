@@ -70,8 +70,8 @@ const initializeGame = (io, roomId, room, activePlayers, socket, categoryName, l
 };
 
 const rooms = {};
+let cachedAllCategories = [];
 
-// --- [추가] 타이머 관리 유틸리티 ---
 const startTimer = (roomId, duration, onTimeUp) => {
   const room = rooms[roomId];
   if (!room) return;
@@ -167,7 +167,6 @@ const processVoteResults = (roomId) => {
 
 };
 
-// --- [추가] 정답 확인 및 결과 발표 공통 로직 ---
 const handleGuessResult = (roomId, guess) => {
   const room = rooms[roomId];
   if (!room) return;
@@ -216,9 +215,11 @@ io.on('connection', (socket) => {
         currentTurnIndex: 0,
         votes: {},
         votedCount: 0,
-        timeLeft: 0,    // [추가]
-        timer: null,    // [추가]
-        roundResults: { voteSuccess: false, guessSuccess: false }
+        timeLeft: 0,
+        timer: null,
+        roundResults: { voteSuccess: false, guessSuccess: false },
+        allCategories: cachedAllCategories,
+        selectedCategories: [...cachedAllCategories]
       };
     }
 
@@ -234,14 +235,14 @@ io.on('connection', (socket) => {
     const newPlayer = {
       id: socket.id,
       name,
-      userType: isPlaying ? 'SPECTATOR' : 'PLAYER', // 추가: 'PLAYER' 또는 'SPECTATOR'
+      userType: isPlaying ? 'SPECTATOR' : 'PLAYER',
       isReady: isHost,
       isHost: isHost,
       role: '',
       word: '',
       votedFor: '',
       score: 0,
-      currentInput: '' // [추가] 실시간 입력값 저장용
+      currentInput: ''
     };
 
     room.players.push(newPlayer);
@@ -254,9 +255,34 @@ io.on('connection', (socket) => {
     });
 
     io.to(roomId).emit('update-game-status', room.status);
+
+    io.to(roomId).emit('update-room-settings', {
+      hostId: room.players.find(p => p.isHost)?.id || null,
+      allCategories: room.allCategories,
+      selectedCategories: room.selectedCategories
+    });
   });
 
-  // [추가] 클라이언트에서 입력 중인 텍스트 수신
+  socket.on('toggle-category', (roomId, category, isChecked) => {
+    const room = rooms[roomId];
+    if (!room || room.status !== 'LOBBY') return;
+
+    const hostPlayer = room.players.find(p => p.isHost);
+    if (!hostPlayer || hostPlayer.id !== socket.id) return;
+
+    if (isChecked) {
+      if (!room.selectedCategories.includes(category)) room.selectedCategories.push(category);
+    } else {
+      room.selectedCategories = room.selectedCategories.filter(c => c !== category);
+    }
+
+    io.to(roomId).emit('update-room-settings', {
+      hostId: hostPlayer.id,
+      allCategories: room.allCategories,
+      selectedCategories: room.selectedCategories
+    });
+  });
+
   socket.on('update-input', (text) => {
     const room = rooms[socket.roomId];
     if (!room) return;
@@ -342,7 +368,11 @@ io.on('connection', (socket) => {
       if (categories.length === 0) return socket.emit('error-message', 'DB에 등록된 단어 카테고리가 없습니다. 관리자에게 문의하세요.');
 
       // 2. 단어 추출 및 데이터 무결성 검증
-      const categoryName = categories[Math.floor(Math.random() * categories.length)];
+      const validCategories = room.selectedCategories;
+      if (!validCategories || validCategories.length === 0) {
+        return socket.emit('error-message', '방장이 카테고리를 최소 1개 이상 선택해야 합니다.');
+      }
+      const categoryName = validCategories[Math.floor(Math.random() * validCategories.length)];
       const shuffledWords = [...wordDb[categoryName]].sort(() => Math.random() - 0.5);
       
       if (shuffledWords.length < 2) {
@@ -461,6 +491,12 @@ app.get(/.*/, (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+getWordDb().then(db => {
+  if (db) {
+    cachedAllCategories = Object.keys(db);
+    console.log('단어 DB 및 카테고리 캐싱 완료:', cachedAllCategories);
+  }
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 });
