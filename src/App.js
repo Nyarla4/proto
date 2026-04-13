@@ -158,6 +158,16 @@ function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLog]);
 
+  useEffect(() => {
+    if (isJoined) {
+      socket.on('update-room-settings', (settings) => {
+        console.log("📡 신호 도착:", settings);
+        setRoomSettings(settings);
+      });
+    }
+    return () => socket.off('update-room-settings');
+  }, [isJoined]); // 입장 성공 직후 리스너 고정
+
   const handleJoin = (e) => {
     e.preventDefault();
     if (name.trim() && roomId.trim()) {
