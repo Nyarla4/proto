@@ -256,14 +256,11 @@ io.on('connection', (socket) => {
 
     io.to(roomId).emit('update-game-status', room.status);
 
-    setTimeout(() => {
-      const hostPlayer = room.players.find(p => p.isHost);
-      io.to(roomId).emit('update-room-settings', {
-        hostId: hostPlayer ? hostPlayer.id : null,
-        allCategories: room.allCategories,
-        selectedCategories: room.selectedCategories
-      });
-    }, 100); // 0.1초 지연으로 클라이언트 리스너 등록 시간 확보
+    io.to(roomId).emit('update-room-settings', {
+      hostId: room.players.find(p => p.isHost)?.id || null,
+      allCategories: room.allCategories,
+      selectedCategories: room.selectedCategories
+    });
   });
 
   socket.on('toggle-category', (roomId, category, isChecked) => {
