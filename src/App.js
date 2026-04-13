@@ -128,16 +128,7 @@ function App() {
       setTimeout(() => setShowError(""), 3000);
     });
     
-    socket.on('update-room-settings', (settings) => {
-      console.log('📡 서버로부터 방 설정 수신:', settings); // 디버깅용 로그 추가
-      if (settings) {
-        setRoomSettings({
-          allCategories: settings.allCategories || [],
-          selectedCategories: settings.selectedCategories || [],
-          // settings.hostId는 현재 UI에서 사용하지 않으므로 일단 둡니다. (amIHost 사용)
-        });
-      }
-    });
+    socket.on('update-room-settings', (settings) => setRoomSettings(settings));
 
     return () => {
       socket.off("update-players");
