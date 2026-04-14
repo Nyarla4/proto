@@ -32,7 +32,7 @@ function App() {
   const [guessWord, setGuessWord] = useState("");
   const [descInput, setDescInput] = useState("");
   const [isInfoVisible, setIsInfoVisible] = useState(true);
-  
+
   // 모달 최소화 상태
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -47,7 +47,7 @@ function App() {
 
   const chatEndRef = useRef(null);
   const descInputRef = useRef("");
-  const guessWordRef = useRef(""); 
+  const guessWordRef = useRef("");
   const currentTurnIdRef = useRef("");
   const gameStatusRef = useRef("LOBBY");
 
@@ -80,7 +80,7 @@ function App() {
     socket.on("disconnect", (reason) => {
       setIsConnected(false);
     });
-    
+
     socket.on("update-players", (data) => setPlayers(data));
     socket.on("chat-message", (data) => setChatLog((prev) => [...prev, data]));
 
@@ -97,7 +97,7 @@ function App() {
       setVotedCount(0);
       setGuessWord("");
       setDescInput("");
-      setIsMinimized(false); 
+      setIsMinimized(false);
     });
 
     socket.on("update-game-status", (status) => {
@@ -112,7 +112,7 @@ function App() {
     });
     socket.on("update-turn", (id) => {
       setCurrentTurnId(id);
-      if (id === socket.id) setIsMinimized(false); 
+      if (id === socket.id) setIsMinimized(false);
     });
     socket.on("update-voted-count", (count) => setVotedCount(count));
 
@@ -141,7 +141,7 @@ function App() {
       setShowError(msg);
       setTimeout(() => setShowError(""), 3000);
     });
-    
+
     socket.on('update-room-settings', (settings) => {
       if (settings) {
         setRoomSettings({
@@ -266,25 +266,25 @@ function App() {
           <form onSubmit={handleJoin} className="space-y-4">
             <div className="space-y-1 text-left">
               <label className="text-[10px] font-black text-slate-400 ml-2 uppercase">Room ID</label>
-            <input
-              type="text"
-              className="w-full p-4 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              required
-            />
+              <input
+                type="text"
+                className="w-full p-4 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-1 text-left">
               <label className="text-[10px] font-black text-slate-400 ml-2 uppercase">Nickname</label>
-            <input
-              type="text"
+              <input
+                type="text"
                 placeholder="닉네임 입력"
-              className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={10}
-            />
+                className="w-full p-5 bg-slate-50 border-2 border-slate-100 focus:border-blue-500 rounded-2xl outline-none font-bold text-center"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                maxLength={10}
+              />
             </div>
             <button type="submit" className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 uppercase active:scale-95">입장하기</button>
           </form>
@@ -312,17 +312,17 @@ function App() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
           <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden w-full max-w-lg animate-in zoom-in-95">
             <div className="h-2 bg-slate-100 w-full overflow-hidden">
-              <div 
+              <div
                 className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 5 ? 'bg-rose-500' : 'bg-blue-600'}`}
                 style={{ width: `${gaugeWidth}%` }}
               />
             </div>
-            
+
             <div className="bg-blue-600 p-4 flex justify-between items-center relative">
               <span className="text-white font-black italic uppercase tracking-tighter text-xl mx-auto">
                 Your Turn
               </span>
-              <button 
+              <button
                 onClick={() => setIsMinimized(true)}
                 className="text-white/80 hover:text-white transition-colors p-1 absolute right-6"
                 title="최소화"
@@ -399,7 +399,7 @@ function App() {
         <span className="font-black italic text-slate-800 tracking-tighter">🕵️ {roomId.toUpperCase()}</span>
         <div className="flex items-center gap-1.5">
           <button
-           onClick={() => setIsInfoVisible(!isInfoVisible)}
+            onClick={() => setIsInfoVisible(!isInfoVisible)}
             className="bg-slate-800 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform"
           >
             {isInfoVisible ? "HIDE INFO" : "SHOW INFO"}
@@ -417,7 +417,7 @@ function App() {
         {/* 모바일 전용 최소화 복구 버튼 (채팅창 위 배치) */}
         {isMinimized && (isMyTurn || (gameStatus === "LIAR_GUESS" && isLiar)) && (
           <div className="md:hidden fixed bottom-[80px] left-2 right-2 z-[55] animate-in slide-in-from-bottom-2">
-            <button 
+            <button
               onClick={() => setIsMinimized(false)}
               className="w-full bg-slate-900 text-white p-4 rounded-2xl shadow-xl border-2 border-white/20 flex items-center justify-between font-black italic uppercase"
             >
@@ -442,7 +442,7 @@ function App() {
           <div className="bg-white p-3 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 shrink-0 flex items-center gap-3 md:gap-4">
             <div className="w-10 h-10 md:w-16 md:h-16 bg-blue-100 rounded-full flex items-center justify-center shrink-0 border-2 md:border-4 border-white text-lg md:text-2xl">
               👤
-              </div>
+            </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="font-black text-base md:text-xl text-slate-900 leading-none truncate max-w-[100px]">{name}</span>
@@ -468,9 +468,9 @@ function App() {
           <div className="bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
             <h2 className="text-base md:text-xl font-black mb-2 md:mb-4 border-b pb-2 flex justify-between items-center shrink-0 uppercase italic text-slate-400">
               {gameStatus === "LOBBY" ? "🏠 Lobby" :
-               gameStatus === "VOTING" ? "🗳 Voting" :
-               gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
-               gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
+                gameStatus === "VOTING" ? "🗳 Voting" :
+                  gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" :
+                    gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
             </h2>
 
             <div className="flex-1 flex flex-col overflow-hidden">
@@ -524,45 +524,59 @@ function App() {
               </div>
             </div>
           </div>
-          
+
           {(gameStatus === "LOBBY" || gameStatus === "RESULT") && roomSettings.allCategories.length > 0 && (
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 w-full mb-3 text-left z-10 relative">
-                <h3 className="text-sm font-bold text-slate-600 mb-3 flex items-center justify-between">
-                  카테고리 설정
-                  <span className={`text-xs px-2 py-1 rounded-full ${amIHost ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {amIHost ? '방장 권한' : '방장만 변경 가능'}
-                  </span>
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {roomSettings.allCategories.map(cat => (
-                    <label key={cat} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${!amIHost ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'} ${roomSettings.selectedCategories.includes(cat) ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-slate-200 text-slate-500'}`}>
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 categoryCheckboxes"
-                        checked={roomSettings.selectedCategories.includes(cat)}
-                        disabled={!amIHost}
-                        onChange={(e) => socket.emit('toggle-category', roomId, cat, e.target.checked)}
-                      />
-                      {cat}
-                    </label>
-                  ))}
-                </div>
-                <div>
-                  <button onClick={(e)=>{for (let index = 0; index < document.getElementsByClassName("categoryCheckboxes").length; index++) {
-    document.getElementsByClassName("categoryCheckboxes")[index].checked = true
-}}}>모두 선택</button>
-                  <button onClick={(e)=>{for (let index = 0; index < document.getElementsByClassName("categoryCheckboxes").length; index++) {
-    document.getElementsByClassName("categoryCheckboxes")[index].checked = false
-}}}>모두 해제</button>
-                </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 w-full mb-3 text-left z-10 relative">
+              <h3 className="text-sm font-bold text-slate-600 mb-3 flex items-center justify-between">
+                카테고리 설정
+                <span className={`text-xs px-2 py-1 rounded-full ${amIHost ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {amIHost ? '방장 권한' : '방장만 변경 가능'}
+                </span>
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {roomSettings.allCategories.map(cat => (
+                  <label key={cat} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${!amIHost ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'} ${roomSettings.selectedCategories.includes(cat) ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-slate-200 text-slate-500'}`}>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 categoryCheckboxes"
+                      checked={roomSettings.selectedCategories.includes(cat)}
+                      disabled={!amIHost}
+                      onChange={(e) => socket.emit('toggle-category', roomId, cat, e.target.checked)}
+                    />
+                    {cat}
+                  </label>
+                ))}
               </div>
-            )}
+              <div>
+                <button onClick={(e) => {
+                  var checkBoxes = document.getElementsByClassName("categoryCheckboxes");
+                  for (let index = 0; index < checkBoxes.length; index++) {
+                    if (!checkBoxes[index].checked) {
+                      checkBoxes[index].click();
+                    }
+                  }
+                }} disabled={!amIHost}>
+                  모두 선택
+                </button>
+                <button onClick={(e) => {
+                  var checkBoxes = document.getElementsByClassName("categoryCheckboxes");
+                  for (let index = 0; index < checkBoxes.length; index++) {
+                    if (checkBoxes[index].checked) {
+                      checkBoxes[index].click();
+                    }
+                  }
+                }} disabled={!amIHost}>
+                  모두 해제
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* PC 액션 패널 영역 (최초 클라이언트 설명 입력 위치) */}
           <div className="bg-white p-3 rounded-[1.5rem] border border-slate-200 shadow-sm shrink-0">
             {isMinimized && (isMyTurn || (gameStatus === "LIAR_GUESS" && isLiar)) ? (
               /* PC용 최소화 복구 버튼 */
-              <button 
+              <button
                 onClick={() => setIsMinimized(false)}
                 className="hidden md:flex w-full bg-slate-900 text-white p-4 rounded-2xl shadow-lg border-2 border-slate-700 flex items-center justify-between font-black italic uppercase hover:bg-slate-800 transition-all group"
               >
@@ -583,10 +597,10 @@ function App() {
                 </button>
               )
             ) : gameStatus === "RESULT" ? (
-                myInfo?.isHost ? (
-                  <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 uppercase italic">다시 시작</button>
-                ) : (
-                  <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
+              myInfo?.isHost ? (
+                <button onClick={handleStartGame} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 uppercase italic">다시 시작</button>
+              ) : (
+                <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${myInfo?.isReady ? "bg-slate-200 text-slate-500" : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
                   {myInfo?.isReady ? "준비완료" : "준비"}
                 </button>
               )
@@ -620,11 +634,10 @@ function App() {
                     {chat.author === name ? "Me" : chat.author}
                   </span>
                 )}
-                <div className={`px-5 py-3 rounded-[1.5rem] max-w-[85%] break-all shadow-sm font-bold text-sm ${
-                  chat.author === 'SYSTEM' ? "bg-slate-900 text-white mx-auto text-center rounded-2xl text-[10px] py-1.5 uppercase" :
-                  chat.author === 'SYSTEM_DESC' ? "bg-blue-600 text-white rounded-[1.5rem] w-full text-center py-6 font-black italic text-xl shadow-xl shadow-blue-100 animate-in slide-in-from-bottom-2" :
-                  chat.author === name ? "bg-blue-600 text-white rounded-tr-none shadow-blue-100" : "bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-none"
-                }`}>
+                <div className={`px-5 py-3 rounded-[1.5rem] max-w-[85%] break-all shadow-sm font-bold text-sm ${chat.author === 'SYSTEM' ? "bg-slate-900 text-white mx-auto text-center rounded-2xl text-[10px] py-1.5 uppercase" :
+                    chat.author === 'SYSTEM_DESC' ? "bg-blue-600 text-white rounded-[1.5rem] w-full text-center py-6 font-black italic text-xl shadow-xl shadow-blue-100 animate-in slide-in-from-bottom-2" :
+                      chat.author === name ? "bg-blue-600 text-white rounded-tr-none shadow-blue-100" : "bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-none"
+                  }`}>
                   {chat.message}
                 </div>
               </div>
