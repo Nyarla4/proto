@@ -370,7 +370,6 @@ function App() {
               </button>
               <button onClick={handleExit} className="text-[10px] font-black px-4 py-2 rounded-xl uppercase border-2 border-[#AF0D4E]/20 bg-white dark:bg-slate-800 text-[#AF0D4E] dark:text-[#FF59A9] hover:bg-[#AF0D4E] hover:text-white transition-all duration-300">Exit Room</button>
             </div>
-            <button onClick={handleExit} className="hidden md:flex text-[10px] font-black px-4 py-2 rounded-xl uppercase border-2 border-[#AF0D4E]/20 bg-white dark:bg-slate-800 text-[#AF0D4E] dark:text-[#FF59A9] hover:bg-[#AF0D4E] hover:text-white transition-all duration-300">Exit Room</button>
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar">
