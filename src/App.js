@@ -55,25 +55,6 @@ function App() {
   const currentTurnIdRef = useRef("");
   const gameStatusRef = useRef("LOBBY");
 
-  // 🔴 Tailwind CDN 주입 전담 (단 1회 실행, 타이밍 경합 해결)
-  useEffect(() => {
-    const scriptId = "tailwind-cdn";
-    if (!document.getElementById(scriptId)) {
-      // 1. 전역 객체에 설정을 미리 정의하여 타이밍 이슈 원천 차단
-      window.tailwind = {
-        config: {
-          darkMode: 'class',
-        }
-      };
-
-      // 2. 이후에 CDN 스크립트 로드
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://cdn.tailwindcss.com";
-      document.head.appendChild(script);
-    }
-  }, []); // 의존성 배열을 비워 최초 1회만 실행되게 함
-
   useEffect(() => { descInputRef.current = descInput; }, [descInput]);
   useEffect(() => { guessWordRef.current = guessWord; }, [guessWord]);
   useEffect(() => { currentTurnIdRef.current = currentTurnId; }, [currentTurnId]);
