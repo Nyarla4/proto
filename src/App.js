@@ -547,28 +547,33 @@ function App() {
                   </label>
                 ))}
               </div>
-              <div>
-                <button onClick={(e) => {
-                  var checkBoxes = document.getElementsByClassName("categoryCheckboxes");
-                  for (let index = 0; index < checkBoxes.length; index++) {
-                    if (!checkBoxes[index].checked) {
-                      checkBoxes[index].click();
-                    }
-                  }
-                }} disabled={!amIHost}>
-                  모두 선택
-                </button>
-                <button onClick={(e) => {
-                  var checkBoxes = document.getElementsByClassName("categoryCheckboxes");
-                  for (let index = 0; index < checkBoxes.length; index++) {
-                    if (checkBoxes[index].checked) {
-                      checkBoxes[index].click();
-                    }
-                  }
-                }} disabled={!amIHost}>
-                  모두 해제
-                </button>
-              </div>
+              {amIHost && (
+                <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100">
+                  <button
+                    onClick={() => {
+                      // DOM이 아닌 데이터를 기반으로 흐름 제어
+                      roomSettings.allCategories.forEach(cat => {
+                        if (!roomSettings.selectedCategories.includes(cat)) {
+                          socket.emit('toggle-category', roomId, cat, true);
+                        }
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                  >
+                    모두 선택
+                  </button>
+                  <button
+                    onClick={() => {
+                      roomSettings.selectedCategories.forEach(cat => {
+                        socket.emit('toggle-category', roomId, cat, false);
+                      });
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 rounded-lg hover:bg-rose-100 transition-colors"
+                  >
+                    모두 해제
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
