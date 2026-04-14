@@ -190,11 +190,6 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900 overflow-hidden text-slate-800 dark:text-slate-100 font-sans relative transition-colors duration-300">
-      
-      <button onClick={() => setIsDarkMode(prev => !prev)} className="fixed top-4 right-4 md:top-6 md:right-6 p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors z-[100] flex items-center justify-center w-10 h-10 text-xl hover:bg-slate-50 dark:hover:bg-slate-700" title="다크모드 토글">
-        {isDarkMode ? '🌙' : '☀️'}
-      </button>
-      
       {showError && <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-[#FF59A9] text-white px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-bounce font-black text-sm uppercase">⚠ {showError}</div>}
 
       {/* 내 차례 설명 모달 */}
@@ -248,6 +243,10 @@ function App() {
       <div className="md:hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-3 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 shrink-0 z-40 transition-colors">
         <span className="font-black italic text-slate-800 dark:text-slate-100 tracking-tighter">🕵️ {roomId.toUpperCase()}</span>
         <div className="flex items-center gap-1.5">
+          {/* 🌟 다크모드 버튼 (모바일용) */}
+          <button onClick={() => setIsDarkMode(prev => !prev)} className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 p-1.5 rounded-full shadow-sm active:scale-95 transition-colors text-xs w-7 h-7 flex items-center justify-center">
+            {isDarkMode ? '🌙' : '☀️'}
+          </button>
           <button onClick={() => setIsInfoVisible(!isInfoVisible)} className="bg-slate-800 dark:bg-slate-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform">{isInfoVisible ? "HIDE INFO" : "SHOW INFO"}</button>
           <button onClick={handleExit} className="bg-[#AF0D4E]/10 text-[#AF0D4E] dark:text-[#FF59A9] border-2 border-[#AF0D4E]/30 px-3 py-1.5 rounded-full text-[10px] font-black uppercase shadow-sm active:scale-95 transition-all duration-300 hover:bg-[#AF0D4E] hover:text-white">EXIT ROOM</button>
         </div>
@@ -364,6 +363,13 @@ function App() {
             <h3 className="font-black text-slate-800 dark:text-slate-200 italic uppercase text-xs flex items-center gap-2">
               <span className="w-2 h-2 bg-[#9489D5] rounded-full animate-pulse"></span> {roomId.toUpperCase()} CHAT
             </h3>
+            {/* 🌟 다크모드 버튼 + Exit 버튼 그룹 (PC용) */}
+            <div className="hidden md:flex items-center gap-2">
+              <button onClick={() => setIsDarkMode(prev => !prev)} className="bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 p-1.5 rounded-xl border border-slate-200 dark:border-slate-600 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600 transition-all w-8 h-8 flex items-center justify-center text-sm" title="다크모드 토글">
+                {isDarkMode ? '🌙' : '☀️'}
+              </button>
+              <button onClick={handleExit} className="text-[10px] font-black px-4 py-2 rounded-xl uppercase border-2 border-[#AF0D4E]/20 bg-white dark:bg-slate-800 text-[#AF0D4E] dark:text-[#FF59A9] hover:bg-[#AF0D4E] hover:text-white transition-all duration-300">Exit Room</button>
+            </div>
             <button onClick={handleExit} className="hidden md:flex text-[10px] font-black px-4 py-2 rounded-xl uppercase border-2 border-[#AF0D4E]/20 bg-white dark:bg-slate-800 text-[#AF0D4E] dark:text-[#FF59A9] hover:bg-[#AF0D4E] hover:text-white transition-all duration-300">Exit Room</button>
           </div>
 
