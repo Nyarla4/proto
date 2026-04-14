@@ -45,11 +45,34 @@ function App() {
     selectedCategories: []
   });
 
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('darkMode') === 'true';
+  });
+
   const chatEndRef = useRef(null);
   const descInputRef = useRef("");
   const guessWordRef = useRef("");
   const currentTurnIdRef = useRef("");
   const gameStatusRef = useRef("LOBBY");
+
+  // 🔴 Tailwind CDN 주입 전담 (단 1회 실행, 타이밍 경합 해결)
+  useEffect(() => {
+    const scriptId = "tailwind-cdn";
+    if (!document.getElementById(scriptId)) {
+      // 1. 전역 객체에 설정을 미리 정의하여 타이밍 이슈 원천 차단
+      window.tailwind = {
+        config: {
+          darkMode: 'class',
+        }
+      };
+
+      // 2. 이후에 CDN 스크립트 로드
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://cdn.tailwindcss.com";
+      document.head.appendChild(script);
+    }
+  }, []); // 의존성 배열을 비워 최초 1회만 실행되게 함
 
   useEffect(() => { descInputRef.current = descInput; }, [descInput]);
   useEffect(() => { guessWordRef.current = guessWord; }, [guessWord]);
@@ -57,14 +80,6 @@ function App() {
   useEffect(() => { gameStatusRef.current = gameStatus; }, [gameStatus]);
 
   useEffect(() => {
-    const scriptId = "tailwind-cdn";
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://cdn.tailwindcss.com";
-      document.head.appendChild(script);
-    }
-
     if (socket.connected) {
       setIsConnected(true);
     }
@@ -173,6 +188,16 @@ function App() {
   useEffect(() => {
   }, [roomSettings]);
 
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('darkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('darkMode', 'false');
+    }
+  }, [isDarkMode]);
+
   const handleJoin = (e) => {
     e.preventDefault();
     if (name.trim() && roomId.trim()) {
@@ -252,7 +277,14 @@ function App() {
 
   if (!isJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 relative font-sans">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 p-4 relative font-sans transition-colors duration-300">        {/* 🔴 다크 모드 토글 버튼 (입장 전) */}
+        <button
+          onClick={() => setIsDarkMode(prev => !prev)}
+          className="fixed top-4 right-4 p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors z-[100] flex items-center justify-center w-10 h-10 text-xl hover:bg-slate-50 dark:hover:bg-slate-700"
+          title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+        >
+          {isDarkMode ? '🌙' : '☀️'}
+        </button>
         {showError && (
           <div className="absolute top-10 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black text-sm uppercase">
             ⚠ {showError}
@@ -300,7 +332,15 @@ function App() {
   const gaugeWidth = timeMax > 0 ? Math.min(100, (timeLeft / timeMax) * 100) : 0;
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans relative">
+    <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900 overflow-hidden text-slate-800 dark:text-slate-100 font-sans relative transition-colors duration-300">
+      {/* 🔴 다크 모드 토글 버튼 (게임 화면) */}
+      <button
+        onClick={() => setIsDarkMode(prev => !prev)}
+        className="fixed top-4 right-4 md:top-6 md:right-6 p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors z-[100] flex items-center justify-center w-10 h-10 text-xl hover:bg-slate-50 dark:hover:bg-slate-700"
+        title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+      >
+        {isDarkMode ? '🌙' : '☀️'}
+      </button>
       {showError && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-bounce font-black text-sm uppercase">
           ⚠ {showError}
