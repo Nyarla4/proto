@@ -547,6 +547,14 @@ function App() {
                     </label>
                   ))}
                 </div>
+                <div>
+                  <button onClick={(e)=>{for (let index = 0; index < document.getElementsByClassName("categoryCheckboxes").length; index++) {
+    document.getElementsByClassName("categoryCheckboxes")[index].checked = true
+}}}>모두 선택</button>
+                  <button onClick={(e)=>{for (let index = 0; index < document.getElementsByClassName("categoryCheckboxes").length; index++) {
+    document.getElementsByClassName("categoryCheckboxes")[index].checked = false
+}}}>모두 해제</button>
+                </div>
               </div>
             )}
 
