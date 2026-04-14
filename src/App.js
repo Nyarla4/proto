@@ -178,6 +178,10 @@ function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLog]);
 
+  useEffect(() => {
+    console.log('🔄 roomSettings 변화:', roomSettings);
+  }, [roomSettings]);
+
   const handleJoin = (e) => {
     e.preventDefault();
     if (name.trim() && roomId.trim()) {
