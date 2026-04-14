@@ -265,7 +265,7 @@ io.on('connection', (socket) => {
 
   socket.on('toggle-category', (roomId, category, isChecked) => {
     const room = rooms[roomId];
-    if (!room || room.status !== 'LOBBY') return;
+    if (!room || (room.status !== 'LOBBY' && room.status !== 'RESULT')) return;
 
     const hostPlayer = room.players.find(p => p.isHost);
     if (!hostPlayer || hostPlayer.id !== socket.id) return;
