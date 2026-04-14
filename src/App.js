@@ -46,7 +46,15 @@ function App() {
   });
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('darkMode') === 'true';
+    const savedMode = localStorage.getItem('darkMode');
+    
+    // 1. 이전에 사용자가 명시적으로 버튼을 눌러 저장한 값이 있다면 그 값을 우선시함
+    if (savedMode !== null) {
+      return savedMode === 'true';
+    }
+    
+    // 2. 저장된 값이 없다면 (최초 접속), OS의 시스템 설정이 다크 모드인지 감지함
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   const chatEndRef = useRef(null);
