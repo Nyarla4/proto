@@ -551,14 +551,13 @@ function App() {
                 <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100">
                   <button
                     onClick={() => {
-                      // DOM이 아닌 데이터를 기반으로 흐름 제어
                       roomSettings.allCategories.forEach(cat => {
                         if (!roomSettings.selectedCategories.includes(cat)) {
                           socket.emit('toggle-category', roomId, cat, true);
                         }
                       });
                     }}
-                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
                   >
                     모두 선택
                   </button>
@@ -568,7 +567,7 @@ function App() {
                         socket.emit('toggle-category', roomId, cat, false);
                       });
                     }}
-                    className="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 rounded-lg hover:bg-rose-100 transition-colors"
+                    className="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors shadow-sm"
                   >
                     모두 해제
                   </button>
