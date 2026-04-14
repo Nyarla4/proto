@@ -45,6 +45,9 @@ function App() {
     selectedCategories: []
   });
 
+  // 🔴 다크 모드 상태 관리
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
   const chatEndRef = useRef(null);
   const descInputRef = useRef("");
   const guessWordRef = useRef("");
@@ -59,6 +62,16 @@ function App() {
   useEffect(() => {
     const scriptId = "tailwind-cdn";
     if (!document.getElementById(scriptId)) {
+      const configScript = document.createElement("script");
+      configScript.innerHTML = `
+        tailwind = {
+          config: {
+            darkMode: 'class',
+          }
+        };
+      `;
+      document.head.appendChild(configScript);
+
       const script = document.createElement("script");
       script.id = scriptId;
       script.src = "https://cdn.tailwindcss.com";
@@ -173,6 +186,15 @@ function App() {
   useEffect(() => {
   }, [roomSettings]);
 
+  // 🔴 다크 모드 상태가 바뀔 때마다 <html> 태그에 'dark' 클래스 토글
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
   const handleJoin = (e) => {
     e.preventDefault();
     if (name.trim() && roomId.trim()) {
@@ -252,12 +274,19 @@ function App() {
 
   if (!isJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 relative font-sans">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 p-4 relative font-sans">
         {showError && (
           <div className="absolute top-10 bg-rose-500 text-white px-8 py-4 rounded-2xl shadow-2xl z-50 animate-bounce font-black text-sm uppercase">
             ⚠ {showError}
           </div>
         )}
+        <button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="fixed top-4 right-4 p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors z-50 flex items-center justify-center w-10 h-10"
+          title={isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환"}
+        >
+          {isDarkMode ? '🌙' : '☀️'}
+        </button>
         <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md border border-slate-200 text-center flex flex-col gap-6">
           <div>
             <h1 className="text-5xl font-black text-blue-600 tracking-tighter italic uppercase mb-2">Liar Game</h1>
