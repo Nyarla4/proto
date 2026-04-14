@@ -538,7 +538,7 @@ function App() {
                     <label key={cat} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${!amIHost ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'} ${roomSettings.selectedCategories.includes(cat) ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-slate-200 text-slate-500'}`}>
                       <input
                         type="checkbox"
-                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 categoryCheckboxes"
                         checked={roomSettings.selectedCategories.includes(cat)}
                         disabled={!amIHost}
                         onChange={(e) => socket.emit('toggle-category', roomId, cat, e.target.checked)}
