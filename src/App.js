@@ -66,25 +66,18 @@ function App() {
     }
 
     if (socket.connected) {
-      console.log("✅ 소켓 이미 연결됨! ID:", socket.id);
       setIsConnected(true);
     }
 
-    // 1. 연결 성공 시
     socket.on("connect", () => {
-      console.log("✅ 소켓 연결 성공! ID:", socket.id);
       setIsConnected(true);
     });
 
-    // 2. 연결 실패(에러) 시
     socket.on("connect_error", (err) => {
       console.error("❌ 소켓 연결 에러 발생:", err.message);
-      // 주소나 포트가 틀렸을 때 여기서 로그가 찍힙니다.
     });
 
-    // 3. 연결 끊김 시
     socket.on("disconnect", (reason) => {
-      console.warn("⚠️ 소켓 연결 끊김:", reason);
       setIsConnected(false);
     });
     
@@ -150,7 +143,6 @@ function App() {
     });
     
     socket.on('update-room-settings', (settings) => {
-      console.log('📡 서버로부터 방 설정 수신:', settings);
       if (settings) {
         setRoomSettings({
           allCategories: settings.allCategories || [],
@@ -179,7 +171,6 @@ function App() {
   }, [chatLog]);
 
   useEffect(() => {
-    console.log('🔄 roomSettings 변화:', roomSettings);
   }, [roomSettings]);
 
   const handleJoin = (e) => {
@@ -534,7 +525,7 @@ function App() {
             </div>
           </div>
           
-          {gameStatus === "LOBBY" && roomSettings.allCategories.length > 0 && (
+          {(gameStatus === "LOBBY" || gameStatus === "RESULT") && roomSettings.allCategories.length > 0 && (
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 w-full mb-3 text-left z-10 relative">
                 <h3 className="text-sm font-bold text-slate-600 mb-3 flex items-center justify-between">
                   카테고리 설정

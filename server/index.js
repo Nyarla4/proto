@@ -256,12 +256,6 @@ io.on('connection', (socket) => {
 
     io.to(roomId).emit('update-game-status', room.status);
 
-    console.log('🔍 update-room-settings 발송 시도:', {
-      roomId,
-      allCategories: room.allCategories,
-      selectedCategories: room.selectedCategories
-    });
-
     io.to(roomId).emit('update-room-settings', {
       hostId: room.players.find(p => p.isHost)?.id || null,
       allCategories: room.allCategories,
