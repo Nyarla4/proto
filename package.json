@@ -19,7 +19,7 @@
   },
   "scripts": {
     "start": "node server/index.js",
-    "build": "npm install && npm run build --prefix .",
+    "build": "react-scripts build", 
     "test": "echo \"Error: no test specified\" && exit 1",
     "eject": "react-scripts eject"
   },
