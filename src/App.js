@@ -65,6 +65,11 @@ function App() {
       document.head.appendChild(script);
     }
 
+    if (socket.connected) {
+      console.log("✅ 소켓 이미 연결됨! ID:", socket.id);
+      setIsConnected(true);
+    }
+
     // 1. 연결 성공 시
     socket.on("connect", () => {
       console.log("✅ 소켓 연결 성공! ID:", socket.id);
@@ -82,7 +87,7 @@ function App() {
       console.warn("⚠️ 소켓 연결 끊김:", reason);
       setIsConnected(false);
     });
-    socket.on("disconnect", () => setIsConnected(false));
+    
     socket.on("update-players", (data) => setPlayers(data));
     socket.on("chat-message", (data) => setChatLog((prev) => [...prev, data]));
 
@@ -144,7 +149,15 @@ function App() {
       setTimeout(() => setShowError(""), 3000);
     });
     
-    socket.on('update-room-settings', (settings) => setRoomSettings(settings));
+    socket.on('update-room-settings', (settings) => {
+      console.log('📡 서버로부터 방 설정 수신:', settings);
+      if (settings) {
+        setRoomSettings({
+          allCategories: settings.allCategories || [],
+          selectedCategories: settings.selectedCategories || []
+        });
+      }
+    });
 
     return () => {
       socket.off("update-players");
