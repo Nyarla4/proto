@@ -266,7 +266,7 @@ function App() {
         )}
 
         {/* 좌측 패널 */}
-        <div className={` ${isInfoVisible ? 'flex' : 'hidden'} md:flex w-full md:w-1/3 flex-col gap-2 md:gap-4 overflow-hidden h-full shrink-0 max-h-[50vh] md:max-h-full transition-all duration-300`}>
+        <div className={` ${isInfoVisible ? 'flex' : 'hidden'} md:flex w-full md:w-1/3 flex-col gap-2 md:gap-4 overflow-y-auto md:overflow-hidden custom-scrollbar h-full shrink-0 max-h-[55vh] md:max-h-full transition-all duration-300`}>
           
           <div className="bg-white dark:bg-slate-800 p-3 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 flex items-center gap-3 md:gap-4 transition-colors">
             <div className="w-10 h-10 md:w-16 md:h-16 bg-[#B3C8F6]/30 dark:bg-[#4260FF]/20 rounded-full flex items-center justify-center shrink-0 border-2 md:border-4 border-white dark:border-slate-800 text-lg md:text-2xl transition-colors">👤</div>
@@ -281,7 +281,7 @@ function App() {
             {isTimerActive && <div className={`ml-auto px-4 py-2 rounded-2xl border-2 font-black text-xl transition-colors ${timeLeft <= 5 ? 'bg-[#FF59A9]/10 border-[#FF59A9] text-[#FF59A9] animate-pulse' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>{timeLeft}s</div>}
           </div>
 
-          <div className="bg-white dark:bg-slate-800 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-slate-700 flex-1 flex flex-col overflow-hidden transition-colors">
+          <div className="bg-white dark:bg-slate-800 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-slate-700 flex-1 flex flex-col overflow-hidden transition-colors min-h-[160px] shrink-0 md:shrink">
             <h2 className="text-base md:text-xl font-black mb-2 md:mb-4 border-b border-slate-100 dark:border-slate-700 pb-2 flex justify-between items-center shrink-0 uppercase italic text-slate-400 dark:text-slate-500 transition-colors">
               {gameStatus === "LOBBY" ? "🏠 Lobby" : gameStatus === "VOTING" ? "🗳 Voting" : gameStatus === "LIAR_GUESS" ? "🤔 Liar's Turn" : gameStatus === "RESULT" ? "🏆 Result" : "🎮 Playing"}
             </h2>
@@ -318,9 +318,9 @@ function App() {
           </div>
 
           {(gameStatus === "LOBBY" || gameStatus === "RESULT") && roomSettings.allCategories.length > 0 && (
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 w-full mb-3 text-left z-10 relative transition-colors">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 w-full mb-3 text-left z-10 relative transition-colors shrink-0">
               <h3 className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-3 flex items-center justify-between">카테고리 설정 <span className={`text-xs px-2 py-1 rounded-full transition-colors ${amIHost ? 'bg-[#B3C8F6]/30 text-[#4260FF] dark:text-[#B3C8F6]' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>{amIHost ? '방장 권한' : '방장만 변경 가능'}</span></h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto custom-scrollbar pr-1">
                 {roomSettings.allCategories.map(cat => (
                   <label key={cat} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${!amIHost ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700'} ${roomSettings.selectedCategories.includes(cat) ? 'border-[#4260FF] text-[#4260FF] dark:text-[#B3C8F6] bg-[#B3C8F6]/20' : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400'}`}>
                     <input type="checkbox" className="w-4 h-4 text-[#4260FF] rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 focus:ring-[#4260FF] categoryCheckboxes" checked={roomSettings.selectedCategories.includes(cat)} disabled={!amIHost} onChange={(e) => socket.emit('toggle-category', roomId, cat, e.target.checked)} /> {cat}
