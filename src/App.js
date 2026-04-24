@@ -40,7 +40,8 @@ function App() {
 
   const [roomSettings, setRoomSettings] = useState({
     allCategories: [],
-    selectedCategories: []
+    selectedCategories: [],
+    liarMode: 'different_word'
   });
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -101,7 +102,11 @@ function App() {
       setShowError(msg); setTimeout(() => setShowError(""), 3000);
     });
     socket.on('update-room-settings', (settings) => {
-      if (settings) setRoomSettings({ allCategories: settings.allCategories || [], selectedCategories: settings.selectedCategories || [] });
+      if (settings) setRoomSettings({
+        allCategories: settings.allCategories || [],
+        selectedCategories: settings.selectedCategories || [],
+        liarMode: settings.liarMode || 'different_word' // ✅ 추가됨 (서버와 동기화)
+      });
     });
 
     return () => {
@@ -145,6 +150,11 @@ function App() {
   const handleExit = () => {
     if (!window.confirm("방에서 나가시겠습니까?")) return;
     socket.disconnect(); setIsJoined(false); setGameStatus("LOBBY"); setChatLog([]); socket.connect();
+  };
+  const handleToggleLiarMode = (mode) => {
+    if (amIHost) {
+      socket.emit('toggle-liar-mode', roomId, mode);
+    }
   };
 
   const myInfo = players.find(p => p.id === socket.id);
@@ -333,6 +343,31 @@ function App() {
                   <button onClick={() => { roomSettings.selectedCategories.forEach(cat => { socket.emit('toggle-category', roomId, cat, false); }); }} className="px-3 py-1.5 text-xs font-semibold text-[#FF59A9] bg-white dark:bg-slate-800 border border-[#FF59A9]/30 rounded-lg hover:bg-rose-50 dark:hover:bg-slate-700 transition-colors shadow-sm">모두 해제</button>
                 </div>
               )}
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 transition-colors">
+                <h3 className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-3">라이어 모드 설정</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleToggleLiarMode('different_word')}
+                    disabled={!amIHost}
+                    className={`flex-1 p-2.5 rounded-lg font-bold text-xs transition-all ${roomSettings.liarMode === 'different_word'
+                        ? "bg-[#4260FF] text-white shadow-md shadow-[#4260FF]/20"
+                        : "bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                      } ${!amIHost ? "cursor-not-allowed opacity-70" : "hover:bg-[#4260FF]/90 hover:text-white"}`}
+                  >
+                    다른 단어 받기
+                  </button>
+                  <button
+                    onClick={() => handleToggleLiarMode('you_are_liar')}
+                    disabled={!amIHost}
+                    className={`flex-1 p-2.5 rounded-lg font-bold text-xs transition-all ${roomSettings.liarMode === 'you_are_liar'
+                        ? "bg-[#FF59A9] text-white shadow-md shadow-[#FF59A9]/20"
+                        : "bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                      } ${!amIHost ? "cursor-not-allowed opacity-70" : "hover:bg-[#FF59A9]/90 hover:text-white"}`}
+                  >
+                    "당신은 라이어입니다"
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

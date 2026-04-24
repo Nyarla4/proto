@@ -69,6 +69,17 @@ const initializeGame = (io, roomId, room, activePlayers, socket, categoryName, l
   }
 };
 
+// [추가] 방 설정을 클라이언트에게 동기화하는 헬퍼 함수
+const emitRoomSettings = (roomId, room) => {
+  if (!room) return;
+  io.to(roomId).emit('update-room-settings', {
+    hostId: room.players.find(p => p.isHost)?.id || null,
+    allCategories: room.allCategories,
+    selectedCategories: room.selectedCategories,
+    liarMode: room.liarMode // 라이어 모드 상태 추가
+  });
+};
+
 const rooms = {};
 let cachedAllCategories = [];
 
@@ -219,7 +230,8 @@ io.on('connection', (socket) => {
         timer: null,
         roundResults: { voteSuccess: false, guessSuccess: false },
         allCategories: cachedAllCategories,
-        selectedCategories: [...cachedAllCategories]
+        selectedCategories: [...cachedAllCategories],
+        liarMode: 'different_word'
       };
     }
 
@@ -256,11 +268,7 @@ io.on('connection', (socket) => {
 
     io.to(roomId).emit('update-game-status', room.status);
 
-    io.to(roomId).emit('update-room-settings', {
-      hostId: room.players.find(p => p.isHost)?.id || null,
-      allCategories: room.allCategories,
-      selectedCategories: room.selectedCategories
-    });
+    emitRoomSettings(roomId, room);
   });
 
   socket.on('toggle-category', (roomId, category, isChecked) => {
@@ -276,11 +284,7 @@ io.on('connection', (socket) => {
       room.selectedCategories = room.selectedCategories.filter(c => c !== category);
     }
 
-    io.to(roomId).emit('update-room-settings', {
-      hostId: hostPlayer.id,
-      allCategories: room.allCategories,
-      selectedCategories: room.selectedCategories
-    });
+    emitRoomSettings(roomId, room);
   });
 
   socket.on('update-input', (text) => {
@@ -302,6 +306,18 @@ io.on('connection', (socket) => {
       author: player.name
     });
   });
+
+  socket.on('toggle-liar-mode', (roomId, mode) => {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  // 방어적 권한 검증 (가드 클로즈)
+  const hostPlayer = room.players.find(p => p.isHost);
+  if (!hostPlayer || hostPlayer.id !== socket.id) return;
+
+  room.liarMode = mode; // 서버 상태 업데이트
+  emitRoomSettings(roomId, room); // 변경된 상태 브로드캐스트
+});
 
   // --- [수정] 턴 전환 로직을 함수로 분리 (시간 초과 시 재사용 위함) ---
   const handleNextTurnInternal = (roomId, targetSocket, description) => {
@@ -360,27 +376,35 @@ io.on('connection', (socket) => {
     }
 
     try {
-      // 1. DB에서 데이터 불러오기
+      // 기존 검증 블록 유지
       const wordDb = await getWordDb();
-      if (!wordDb) return socket.emit('error-message', '단어 DB를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      if (!wordDb) return socket.emit('error-message', '단어 DB를 불러오지 못했습니다.');
 
       const categories = Object.keys(wordDb);
-      if (categories.length === 0) return socket.emit('error-message', 'DB에 등록된 단어 카테고리가 없습니다. 관리자에게 문의하세요.');
+      if (categories.length === 0) return socket.emit('error-message', 'DB에 등록된 단어 카테고리가 없습니다.');
 
-      // 2. 단어 추출 및 데이터 무결성 검증
       const validCategories = room.selectedCategories;
       if (!validCategories || validCategories.length === 0) {
         return socket.emit('error-message', '방장이 카테고리를 최소 1개 이상 선택해야 합니다.');
       }
-      const categoryName = validCategories[Math.floor(Math.random() * validCategories.length)];
-      const shuffledWords = [...wordDb[categoryName]].sort(() => Math.random() - 0.5);
-      
-      if (shuffledWords.length < 2) {
-        return socket.emit('error-message', `[${categoryName}] 카테고리에 단어가 부족합니다. (최소 2개 필요)`);
-      }
 
-      const liarWord = shuffledWords[0];
-      const citizenWord = shuffledWords[1]; 
+      const categoryName = validCategories[Math.floor(Math.random() * validCategories.length)];
+      const categoryWords = wordDb[categoryName] || [];
+
+      // 여기서부터 새 코드의 liarMode 분기로 교체
+      let citizenWord = "";
+      let liarWord = "";
+
+      if (room.liarMode === 'you_are_liar') {
+        if (categoryWords.length < 1) return socket.emit('error-message', `[${categoryName}] 카테고리에 단어가 없습니다.`);
+        citizenWord = categoryWords[Math.floor(Math.random() * categoryWords.length)];
+        liarWord = "당신은 라이어입니다";
+      } else {
+        if (categoryWords.length < 2) return socket.emit('error-message', `[${categoryName}] 카테고리에 단어가 부족합니다. (최소 2개 필요)`);
+        const shuffledWords = [...categoryWords].sort(() => Math.random() - 0.5);
+        citizenWord = shuffledWords[0];
+        liarWord = shuffledWords[1];
+      }
 
       // 3. 검증된 데이터로 분리된 게임 초기화 함수 호출
       initializeGame(io, roomId, room, activePlayers, socket, categoryName, liarWord, citizenWord, startTimer, handleNextTurnInternal);
