@@ -187,9 +187,20 @@ const handleGuessResult = (roomId, guess) => {
   const liar = room.players.find(p => p.role === 'LIAR');
   if (!liar) return;
 
-  // 입력값의 앞뒤 공백을 제거하고 시민 단어와 비교합니다.
-  const finalGuess = (guess || "").trim();
-  const isCorrect = finalGuess === room.citizenWord;
+  const cleanGuess = (guess || "").replace(/\s+/g, "").toLowerCase();
+  const cleanAnswer = (room.citizenWord || "").replace(/\s+/g, "").toLowerCase();
+  
+  // 1. 완전히 일치하는지 확인
+  let isCorrect = cleanGuess === cleanAnswer;
+
+  // 2. 일치하지 않는다면, 오타(거리)가 1 이하인지 확인 (단, 정답이 3글자 이상일 때만)
+  if (!isCorrect && cleanAnswer.length >= 3) {
+    const distance = getEditDistance(cleanGuess, cleanAnswer);
+    if (distance <= 1) {
+      isCorrect = true; // 1글자 오타는 정답으로 인정!
+    }
+  }
+
   room.roundResults.guessSuccess = isCorrect;
 
   if (isCorrect) {
@@ -212,6 +223,29 @@ const handleGuessResult = (roomId, guess) => {
   io.to(roomId).emit('update-game-status', 'RESULT');
   io.to(roomId).emit('update-players', room.players);
 };
+
+// [추가] 두 단어의 오타(유사도) 거리를 계산하는 함수
+function getEditDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+  for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // 교체
+          matrix[i][j - 1] + 1,     // 삽입
+          matrix[i - 1][j] + 1      // 삭제
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
 
 io.on('connection', (socket) => {
   socket.on('join-room', ({ roomId, name }) => {
