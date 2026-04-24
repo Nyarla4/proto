@@ -344,28 +344,39 @@ function App() {
                 </div>
               )}
               <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 transition-colors">
-                <h3 className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-3">라이어 모드 설정</h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleToggleLiarMode('different_word')}
-                    disabled={!amIHost}
-                    className={`flex-1 p-2.5 rounded-lg font-bold text-xs transition-all ${roomSettings.liarMode === 'different_word'
-                        ? "bg-[#4260FF] text-white shadow-md shadow-[#4260FF]/20"
-                        : "bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                      } ${!amIHost ? "cursor-not-allowed opacity-70" : "hover:bg-[#4260FF]/90 hover:text-white"}`}
+                <div
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-colors ${amIHost
+                      ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 border-slate-200 dark:border-slate-600'
+                      : 'cursor-not-allowed opacity-70 bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700'
+                    }`}
+                  onClick={() => {
+                    if (amIHost) {
+                      // 현재 모드의 반대 모드로 토글
+                      handleToggleLiarMode(roomSettings.liarMode === 'different_word' ? 'you_are_liar' : 'different_word');
+                    }
+                  }}
+                >
+                  <div className="flex flex-col pr-4">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                      라이어 단어 제공 방식
+                    </span>
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                      {roomSettings.liarMode === 'different_word'
+                        ? '🟢 같은 카테고리의 다른 단어 받기'
+                        : '🟣 "당신은 라이어입니다" 고정 문구'}
+                    </span>
+                  </div>
+
+                  {/* 토글 스위치 본체 */}
+                  <div
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-300 ease-in-out ${roomSettings.liarMode === 'you_are_liar' ? 'bg-[#FF59A9]' : 'bg-[#4260FF]'
+                      }`}
                   >
-                    다른 단어 받기
-                  </button>
-                  <button
-                    onClick={() => handleToggleLiarMode('you_are_liar')}
-                    disabled={!amIHost}
-                    className={`flex-1 p-2.5 rounded-lg font-bold text-xs transition-all ${roomSettings.liarMode === 'you_are_liar'
-                        ? "bg-[#FF59A9] text-white shadow-md shadow-[#FF59A9]/20"
-                        : "bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                      } ${!amIHost ? "cursor-not-allowed opacity-70" : "hover:bg-[#FF59A9]/90 hover:text-white"}`}
-                  >
-                    "당신은 라이어입니다"
-                  </button>
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${roomSettings.liarMode === 'you_are_liar' ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
