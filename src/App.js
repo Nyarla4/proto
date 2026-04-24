@@ -362,8 +362,8 @@ function App() {
                     </span>
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
                       {roomSettings.liarMode === 'different_word'
-                        ? '🟢 같은 카테고리의 다른 단어 받기'
-                        : '🟣 "당신은 라이어입니다" 고정 문구'}
+                        ? '🟢 다른 단어 받기'
+                        : '🟣 "라이어" 문구 받기'}
                     </span>
                   </div>
 
